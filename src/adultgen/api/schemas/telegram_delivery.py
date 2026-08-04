@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from pydantic import BaseModel, Field
 
 from adultgen.telegram_gateway.result_delivery import TelegramDeliveryMediaKind
@@ -19,6 +21,8 @@ class TelegramResultDeliveryRequest(BaseModel):
     include_mini_app_buttons: bool = True
     profile_public_id: str | None = None
     referral_code: str | None = None
+    user_id: uuid.UUID | None = None
+    generation_task_id: uuid.UUID | None = None
 
 
 class TelegramResultDeliveryResponse(BaseModel):
@@ -29,3 +33,4 @@ class TelegramResultDeliveryResponse(BaseModel):
     chat_id: int
     telegram_message_id: int
     media_kind: TelegramDeliveryMediaKind
+    notification_delivery_id: uuid.UUID
