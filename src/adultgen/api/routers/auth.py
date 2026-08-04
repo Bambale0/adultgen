@@ -1,5 +1,7 @@
 """Authentication routes."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,8 +31,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/telegram-mini-app", response_model=TelegramMiniAppAuthResponse)
 async def authenticate_telegram_mini_app(
     payload: TelegramMiniAppAuthRequest,
-    session: AsyncSession = Depends(get_db_session),
-    settings: Settings = Depends(get_runtime_settings),
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_runtime_settings)],
 ) -> TelegramMiniAppAuthResponse:
     """Authenticate Mini App initData and return a Core API access token."""
 
