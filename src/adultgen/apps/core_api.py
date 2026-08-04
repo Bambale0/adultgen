@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 
 from adultgen import __version__
-from adultgen.api.routers import admin, adult_consent, auth, generations, system
+from adultgen.api.routers import admin, adult_consent, auth, generations, system, workspace
 
 
 def create_app() -> FastAPI:
@@ -19,6 +19,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(generations.router)
     app.include_router(adult_consent.router)
+    app.include_router(workspace.router)
     app.include_router(admin.router)
 
     return app
