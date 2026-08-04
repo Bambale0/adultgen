@@ -35,8 +35,8 @@ def get_runtime_settings() -> Settings:
 
 
 def get_current_token_claims(
+    settings: Annotated[Settings, Depends(get_runtime_settings)],
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
-    settings: Annotated[Settings, Depends(get_runtime_settings)] = None,
 ) -> AccessTokenClaims:
     """Verify Authorization: Bearer token and return access-token claims."""
 
