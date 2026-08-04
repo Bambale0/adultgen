@@ -1,5 +1,8 @@
 """FastAPI dependency providers."""
 
+from __future__ import annotations
+
+import hmac
 from collections.abc import AsyncIterator
 from functools import lru_cache
 from typing import Annotated
@@ -54,3 +57,23 @@ def get_current_token_claims(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
         ) from exc
+
+
+def require_admin_api_token(
+    settings: Annotated[Settings, Depends(get_runtime_settings)],
+    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+) -> None:
+    """Require static admin bearer token for early admin endpoints."""
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing admin bearer token.",
+        )
+
+    token = authorization.removeprefix("Bearer ").strip()
+    if not hmac.compare_digest(token, settings.admin_api_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid admin bearer token.",
+        )

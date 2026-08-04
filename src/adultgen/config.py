@@ -50,6 +50,7 @@ class Settings(BaseSettings):
         default=86_400,
         alias="MINI_APP_AUTH_MAX_AGE_SECONDS",
     )
+    admin_api_token: str = Field(alias="ADMIN_API_TOKEN")
 
 
 @lru_cache(maxsize=1)
