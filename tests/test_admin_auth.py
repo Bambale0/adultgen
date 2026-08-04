@@ -4,9 +4,33 @@ from adultgen.apps.core_api import create_app
 from adultgen.config import get_settings
 
 
-def test_admin_health_rejects_missing_token(monkeypatch) -> None:
-    monkeypatch.setenv("ADMIN_API_TOKEN", "secret-admin")
+REQUIRED_TEST_ENV = {
+    "DATABASE_URL": "postgresql+asyncpg://adultgen:adultgen@localhost:5432/adultgen",
+    "REDIS_URL": "redis://localhost:6379/0",
+    "S3_ENDPOINT_URL": "http://localhost:9000",
+    "S3_ACCESS_KEY": "test",
+    "S3_SECRET_KEY": "test",
+    "TELEGRAM_DEFAULT_WEBHOOK_SECRET": "test-webhook-secret",
+    "TELEGRAM_DEFAULT_BOT_TOKEN": "123456:test",
+    "KIE_API_KEY": "test-kie-key",
+    "KIE_CALLBACK_URL": "https://example.com/webhooks/kie",
+    "BILLING_BASE_URL": "https://pay.example.com",
+    "SHARPAY_API_KEY": "test-sharpay",
+    "CROCOPAY_API_KEY": "test-crocopay",
+    "CROCOPAY_SECRET": "test-crocopay-secret",
+    "JWT_SECRET": "test-jwt-secret",
+}
+
+
+def _prepare_admin_test_env(monkeypatch, *, admin_token: str = "secret-admin") -> None:
+    for key, value in REQUIRED_TEST_ENV.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setenv("ADMIN_API_TOKEN", admin_token)
     get_settings.cache_clear()
+
+
+def test_admin_health_rejects_missing_token(monkeypatch) -> None:
+    _prepare_admin_test_env(monkeypatch)
     client = TestClient(create_app())
 
     response = client.get("/admin/health")
@@ -16,8 +40,7 @@ def test_admin_health_rejects_missing_token(monkeypatch) -> None:
 
 
 def test_admin_health_rejects_wrong_token(monkeypatch) -> None:
-    monkeypatch.setenv("ADMIN_API_TOKEN", "secret-admin")
-    get_settings.cache_clear()
+    _prepare_admin_test_env(monkeypatch)
     client = TestClient(create_app())
 
     response = client.get(
@@ -30,8 +53,7 @@ def test_admin_health_rejects_wrong_token(monkeypatch) -> None:
 
 
 def test_admin_health_accepts_valid_token(monkeypatch) -> None:
-    monkeypatch.setenv("ADMIN_API_TOKEN", "secret-admin")
-    get_settings.cache_clear()
+    _prepare_admin_test_env(monkeypatch)
     client = TestClient(create_app())
 
     response = client.get(
