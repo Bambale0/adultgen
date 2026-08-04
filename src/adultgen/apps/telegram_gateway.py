@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 
 from adultgen import __version__
-from adultgen.api.routers import telegram_gateway
+from adultgen.api.routers import telegram_delivery, telegram_gateway
 
 
 def create_app() -> FastAPI:
@@ -15,6 +15,7 @@ def create_app() -> FastAPI:
         description="Webhook gateway for replaceable Telegram bot channels.",
     )
     app.include_router(telegram_gateway.router)
+    app.include_router(telegram_delivery.router)
     return app
 
 
