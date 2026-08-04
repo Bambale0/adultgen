@@ -13,6 +13,7 @@ AdultGen is designed as a backend-first platform:
 - Temporary generation media expires after 24 hours unless published.
 - Published profile/feed media is stored permanently until user/admin deletion.
 - Adult feed access requires 18+ consent and admin-controlled moderation.
+- Model capabilities are explicit: Seedream and Seedance payloads are selected through scenario-specific provider capability rules, not a single generic generation form.
 
 ## MVP product scope
 
@@ -20,7 +21,7 @@ AdultGen is designed as a backend-first platform:
 - Manual project and scene creation.
 - Saved avatar photo sets.
 - Seedream 5 Pro image generation/editing.
-- Seedance 2.0 video generation.
+- Seedance 2.0 video generation with text-to-video, first-frame, first+last-frame, and multimodal reference workflows.
 - Optional manually invoked AI Director.
 - Parallel generation jobs.
 - Internal credits and subscription plans.
@@ -37,6 +38,7 @@ docs/
 ├── ARCHITECTURE.md
 ├── API_CONTRACTS.md
 ├── DATA_MODEL.md
+├── MODEL_CAPABILITIES.md
 ├── OPERATIONAL_FLOWS.md
 ├── ROADMAP.md
 └── SAFETY_COMPLIANCE.md
@@ -71,3 +73,5 @@ curl http://localhost:8000/health
 ## Development status
 
 Current branch contains the architecture baseline and initial Python scaffold. Implementation should proceed by phases in `docs/ROADMAP.md`.
+
+Before implementing the generation worker or Mini App creation flow, read `docs/MODEL_CAPABILITIES.md`. It defines the exact Seedream/Seedance operation split, payload mapping, mutual exclusion rules, callback behavior, and provider validation requirements.
