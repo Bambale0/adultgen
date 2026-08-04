@@ -15,7 +15,6 @@ from adultgen.domain.media_storage import (
 )
 from adultgen.storage.local import LocalObjectStorage
 
-
 BUCKETS = BucketNames(
     temporary="media-temporary",
     published="media-published",
