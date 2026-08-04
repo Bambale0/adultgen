@@ -60,7 +60,12 @@ class CreatedAtMixin:
     )
 
 
-def jsonb_default() -> Mapped[dict[str, Any]]:
-    """Return a mutable JSONB column with an empty dict default."""
+def jsonb_default() -> Mapped[Any]:
+    """Return a JSONB column with an empty object default.
+
+    Different domains use this helper for dict-shaped payloads and list-shaped
+    button arrays. The database type is still JSONB; validation belongs to
+    Pydantic schemas and domain services.
+    """
 
     return mapped_column(JSONB, default=dict, server_default="{}", nullable=False)
