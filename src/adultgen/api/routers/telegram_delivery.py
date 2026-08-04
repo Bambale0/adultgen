@@ -17,6 +17,11 @@ from adultgen.api.schemas.telegram_delivery import (
     TelegramResultDeliveryResponse,
 )
 from adultgen.config import Settings
+from adultgen.services.notification_deliveries import (
+    create_notification_delivery,
+    mark_notification_delivery_failure,
+    mark_notification_delivery_success,
+)
 from adultgen.services.users import (
     BotTokenResolver,
     UserServiceError,
@@ -47,6 +52,19 @@ async def deliver_telegram_result(
 
     try:
         channel = await get_active_telegram_channel(session, bot_username=payload.bot_username)
+        delivery = await create_notification_delivery(
+            session,
+            telegram_channel_id=channel.id,
+            telegram_chat_id=payload.chat_id,
+            user_id=payload.user_id,
+            generation_task_id=payload.generation_task_id,
+            payload={
+                "media_kind": payload.media_kind.value,
+                "has_media_url": payload.media_url is not None,
+                "has_telegram_file_id": payload.telegram_file_id is not None,
+                "include_mini_app_buttons": payload.include_mini_app_buttons,
+            },
+        )
         bot_token = BotTokenResolver(settings).resolve(channel.secret_ref)
         reply_markup = None
         if payload.include_mini_app_buttons and channel.mini_app_url:
@@ -71,17 +89,34 @@ async def deliver_telegram_result(
             )
         finally:
             await bot.session.close()
+        await mark_notification_delivery_success(
+            session,
+            delivery_id=delivery.id,
+            telegram_message_id=result.telegram_message_id,
+        )
     except UserServiceError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
     except ResultDeliveryError as exc:
+        if "delivery" in locals():
+            await mark_notification_delivery_failure(
+                session,
+                delivery_id=delivery.id,
+                error_message=str(exc),
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
     except TelegramAPIError as exc:
+        if "delivery" in locals():
+            await mark_notification_delivery_failure(
+                session,
+                delivery_id=delivery.id,
+                error_message=str(exc),
+            )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Telegram delivery failed.",
@@ -93,4 +128,5 @@ async def deliver_telegram_result(
         chat_id=result.chat_id,
         telegram_message_id=result.telegram_message_id,
         media_kind=result.media_kind,
+        notification_delivery_id=delivery.id,
     )
