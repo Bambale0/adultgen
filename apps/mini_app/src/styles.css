@@ -83,8 +83,30 @@ button:disabled {
 }
 
 .adult-gate-card,
-.create-flow-card {
+.create-flow-card,
+.profile-card {
   gap: 18px;
+}
+
+.profile-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.profile-panel strong {
+  color: #ffffff;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .eyebrow {
@@ -119,14 +141,23 @@ h1 {
   color: #a7ffcf;
 }
 
-.primary-button {
+.primary-button,
+.secondary-button {
   width: 100%;
   min-height: 52px;
   border: 0;
   border-radius: 18px;
+  font-weight: 800;
+}
+
+.primary-button {
   color: #111111;
   background: #ffffff;
-  font-weight: 800;
+}
+
+.secondary-button {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .bottom-nav {
