@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     s3_published_bucket: str = Field(default="media-published", alias="S3_PUBLISHED_BUCKET")
     s3_references_bucket: str = Field(default="media-references", alias="S3_REFERENCES_BUCKET")
     s3_webhook_bucket: str = Field(default="webhook-archive", alias="S3_WEBHOOK_BUCKET")
+    media_temp_ttl_seconds: int = Field(default=86_400, alias="MEDIA_TEMP_TTL_SECONDS")
 
     telegram_default_webhook_secret: str = Field(alias="TELEGRAM_DEFAULT_WEBHOOK_SECRET")
     telegram_default_bot_token: str = Field(alias="TELEGRAM_DEFAULT_BOT_TOKEN")
