@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     )
     admin_api_token: str = Field(alias="ADMIN_API_TOKEN")
 
+    adult_policy_version: str = Field(default="adult-policy-v1", alias="ADULT_POLICY_VERSION")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
