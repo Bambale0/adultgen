@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from functools import lru_cache
+from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +19,7 @@ def get_database() -> Database:
 
 
 async def get_db_session(
-    database: Database = Depends(get_database),
+    database: Annotated[Database, Depends(get_database)],
 ) -> AsyncIterator[AsyncSession]:
     """Yield a transactional SQLAlchemy session for one API request."""
 
