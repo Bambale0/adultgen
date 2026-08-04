@@ -1,5 +1,5 @@
-from adultgen.db.base import Base
 import adultgen.db.models  # noqa: F401
+from adultgen.db.base import Base
 
 
 def test_orm_metadata_contains_core_tables() -> None:
