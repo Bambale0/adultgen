@@ -8,6 +8,7 @@ from adultgen.db.models.broadcasts import Broadcast, BroadcastRecipient
 from adultgen.db.models.generations import GenerationTask, SceneTake
 from adultgen.db.models.media import MediaAsset
 from adultgen.db.models.moderation import ModerationCase
+from adultgen.db.models.notifications import NotificationDelivery
 from adultgen.db.models.payments import PaymentOrder, PaymentWebhookProcessing, PaymentWebhookRaw
 from adultgen.db.models.projects import (
     AvatarProfile,
@@ -44,6 +45,7 @@ __all__ = [
     "GenerationTask",
     "MediaAsset",
     "ModerationCase",
+    "NotificationDelivery",
     "PartnerCommission",
     "PartnerPayoutRequest",
     "PartnerWallet",
