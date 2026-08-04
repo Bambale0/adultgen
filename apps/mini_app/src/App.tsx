@@ -6,6 +6,7 @@ import {
   type AdultConsentStatus,
 } from './adultConsent';
 import { useTelegramMiniAppAuth } from './auth';
+import { CreateFlowStarter } from './createFlow';
 import { PlaceholderPage } from './pages';
 import { findRouteByPath, primaryNavRouteIds, routes, type MiniAppRouteId } from './routes';
 import { prepareTelegramViewport } from './telegram';
@@ -95,6 +96,8 @@ export function App() {
           error={adultConsentError}
           onAccept={() => void handleAcceptAdultConsent()}
         />
+      ) : activeRoute.id === 'create' ? (
+        <CreateFlowStarter accessToken={authState.session.access_token} />
       ) : (
         <PlaceholderPage routeId={activeRoute.id} />
       )}
