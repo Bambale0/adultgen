@@ -148,3 +148,10 @@ class PartnerPayoutStatus(StrEnum):
     PROCESSING = "processing"
     PAID = "paid"
     CANCELLED = "cancelled"
+
+
+class NotificationDeliveryStatus(StrEnum):
+    PENDING = "pending"
+    DELIVERED = "delivered"
+    RETRY_SCHEDULED = "retry_scheduled"
+    FAILED = "failed"
