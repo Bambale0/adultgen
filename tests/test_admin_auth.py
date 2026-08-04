@@ -3,7 +3,6 @@ from fastapi.testclient import TestClient
 from adultgen.apps.core_api import create_app
 from adultgen.config import get_settings
 
-
 REQUIRED_TEST_ENV = {
     "DATABASE_URL": "postgresql+asyncpg://adultgen:adultgen@localhost:5432/adultgen",
     "REDIS_URL": "redis://localhost:6379/0",
