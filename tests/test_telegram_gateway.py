@@ -1,0 +1,71 @@
+import pytest
+
+from adultgen.telegram_gateway.dispatcher import create_dispatcher
+from adultgen.telegram_gateway.security import (
+    TelegramWebhookSecurityError,
+    hash_webhook_secret,
+    verify_webhook_secret,
+)
+from adultgen.telegram_gateway.updates import TelegramUpdateError, summarize_update
+
+
+def test_webhook_secret_hash_verification_accepts_matching_secret() -> None:
+    expected_hash = hash_webhook_secret("secret-token")
+
+    verify_webhook_secret(
+        provided_secret="secret-token",
+        expected_hash=expected_hash,
+    )
+
+
+def test_webhook_secret_hash_verification_rejects_wrong_secret() -> None:
+    expected_hash = hash_webhook_secret("secret-token")
+
+    with pytest.raises(TelegramWebhookSecurityError, match="Invalid"):
+        verify_webhook_secret(
+            provided_secret="wrong-token",
+            expected_hash=expected_hash,
+        )
+
+
+def test_summarize_update_extracts_chat_id_and_start_payload() -> None:
+    summary = summarize_update(
+        {
+            "update_id": 123,
+            "message": {
+                "chat": {"id": 456},
+                "text": "/start profile_abc123",
+            },
+        }
+    )
+
+    assert summary.update_id == 123
+    assert summary.message_chat_id == 456
+    assert summary.start_payload == "profile_abc123"
+
+
+def test_summarize_update_accepts_non_start_messages() -> None:
+    summary = summarize_update(
+        {
+            "update_id": 123,
+            "message": {
+                "chat": {"id": 456},
+                "text": "hello",
+            },
+        }
+    )
+
+    assert summary.update_id == 123
+    assert summary.message_chat_id == 456
+    assert summary.start_payload is None
+
+
+def test_summarize_update_rejects_missing_update_id() -> None:
+    with pytest.raises(TelegramUpdateError, match="update_id"):
+        summarize_update({"message": {"text": "/start"}})
+
+
+def test_aiogram_dispatcher_factory_returns_dispatcher() -> None:
+    dispatcher = create_dispatcher()
+
+    assert dispatcher is not None
