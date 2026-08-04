@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adultgen.api.dependencies import get_db_session
-from adultgen.services.users import UserServiceError, get_active_telegram_channel
+from adultgen.services.users import (
+    UserServiceError,
+    get_active_telegram_channel,
+    record_user_channel_activity,
+    upsert_user_from_telegram,
+)
 from adultgen.telegram_gateway.security import (
     TelegramWebhookSecurityError,
     verify_webhook_secret,
@@ -38,6 +43,20 @@ async def telegram_webhook(
         if not isinstance(payload, dict):
             raise TelegramUpdateError("Telegram webhook payload must be a JSON object.")
         summary = summarize_update(payload)
+        tracked_user_id = None
+        if summary.telegram_user is not None:
+            user = await upsert_user_from_telegram(
+                session,
+                telegram_user=summary.telegram_user,
+            )
+            tracked_user_id = user.id
+            await record_user_channel_activity(
+                session,
+                user_id=user.id,
+                telegram_channel_id=channel.id,
+                telegram_chat_id=summary.message_chat_id,
+                start_payload=summary.start_payload,
+            )
     except UserServiceError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -60,6 +79,7 @@ async def telegram_webhook(
         "bot_username": channel.bot_username,
         "update_id": summary.update_id,
         "message_chat_id": summary.message_chat_id,
+        "tracked_user_id": str(tracked_user_id) if tracked_user_id else None,
         "start_payload": summary.start_payload,
         "start_payload_kind": parsed_start_payload.kind.value if parsed_start_payload else None,
         "profile_public_id": (
