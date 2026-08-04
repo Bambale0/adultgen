@@ -1,7 +1,10 @@
 import pytest
 
 from adultgen.domain.enums import GenerationOperation, ModelCode
-from adultgen.domain.model_capabilities import CapabilityValidationError, validate_generation_payload
+from adultgen.domain.model_capabilities import (
+    CapabilityValidationError,
+    validate_generation_payload,
+)
 
 
 def test_seedance_first_last_frame_rejects_multimodal_references() -> None:
