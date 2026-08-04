@@ -9,7 +9,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from adultgen.domain.enums import BillingUnit, GenerationOperation, KieProviderModel, ModelCode, ModelProvider
+from adultgen.domain.enums import (
+    BillingUnit,
+    GenerationOperation,
+    KieProviderModel,
+    ModelCode,
+    ModelProvider,
+)
 
 
 class CapabilityValidationError(ValueError):
@@ -60,7 +66,9 @@ class ModelCapability:
             )
 
         forbidden = (self.forbidden_fields_by_operation or {}).get(operation, frozenset())
-        present_forbidden = sorted(field for field in forbidden if not _is_empty(payload.get(field)))
+        present_forbidden = sorted(
+            field for field in forbidden if not _is_empty(payload.get(field))
+        )
         if present_forbidden:
             raise CapabilityValidationError(
                 f"Payload for {operation.value!r} contains forbidden fields: "
@@ -74,15 +82,24 @@ class ModelCapability:
             )
 
         resolution = payload.get("resolution")
-        if self.resolution_values and resolution is not None and resolution not in self.resolution_values:
+        if (
+            self.resolution_values
+            and resolution is not None
+            and resolution not in self.resolution_values
+        ):
             raise CapabilityValidationError(
                 f"Unsupported resolution {resolution!r}; allowed values: {self.resolution_values}."
             )
 
         aspect_ratio = payload.get("aspect_ratio")
-        if self.aspect_ratio_values and aspect_ratio is not None and aspect_ratio not in self.aspect_ratio_values:
+        if (
+            self.aspect_ratio_values
+            and aspect_ratio is not None
+            and aspect_ratio not in self.aspect_ratio_values
+        ):
             raise CapabilityValidationError(
-                f"Unsupported aspect_ratio {aspect_ratio!r}; allowed values: {self.aspect_ratio_values}."
+                f"Unsupported aspect_ratio {aspect_ratio!r}; "
+                f"allowed values: {self.aspect_ratio_values}."
             )
 
 
@@ -93,9 +110,7 @@ def _is_empty(value: object) -> bool:
         return True
     if isinstance(value, str) and value == "":
         return True
-    if isinstance(value, list | tuple | set | dict) and len(value) == 0:
-        return True
-    return False
+    return isinstance(value, list | tuple | set | dict) and len(value) == 0
 
 
 SEEDREAM_ASPECT_RATIOS = ("1:1", "4:3", "3:4", "16:9", "9:16")
