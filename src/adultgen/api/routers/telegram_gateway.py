@@ -54,10 +54,16 @@ async def telegram_webhook(
             detail=str(exc),
         ) from exc
 
+    parsed_start_payload = summary.parsed_start_payload
     return {
         "ok": True,
         "bot_username": channel.bot_username,
         "update_id": summary.update_id,
         "message_chat_id": summary.message_chat_id,
         "start_payload": summary.start_payload,
+        "start_payload_kind": parsed_start_payload.kind.value if parsed_start_payload else None,
+        "profile_public_id": (
+            parsed_start_payload.profile_public_id if parsed_start_payload else None
+        ),
+        "referral_code": parsed_start_payload.referral_code if parsed_start_payload else None,
     }

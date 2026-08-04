@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from adultgen.telegram_gateway.start_payload import StartPayload, parse_start_payload
+
 
 class TelegramUpdateError(ValueError):
     """Raised when an incoming Telegram update is malformed."""
@@ -17,6 +19,7 @@ class TelegramUpdateSummary:
     update_id: int
     message_chat_id: int | None
     start_payload: str | None
+    parsed_start_payload: StartPayload | None
 
 
 def summarize_update(payload: dict[str, Any]) -> TelegramUpdateSummary:
@@ -34,6 +37,7 @@ def summarize_update(payload: dict[str, Any]) -> TelegramUpdateSummary:
         update_id=raw_update_id,
         message_chat_id=message_chat_id,
         start_payload=start_payload,
+        parsed_start_payload=parse_start_payload(start_payload),
     )
 
 
