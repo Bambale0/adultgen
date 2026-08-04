@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     s3_webhook_bucket: str = Field(default="webhook-archive", alias="S3_WEBHOOK_BUCKET")
 
     telegram_default_webhook_secret: str = Field(alias="TELEGRAM_DEFAULT_WEBHOOK_SECRET")
+    telegram_default_bot_token: str = Field(alias="TELEGRAM_DEFAULT_BOT_TOKEN")
 
     kie_api_base_url: str = Field(default="https://api.kie.ai", alias="KIE_API_BASE_URL")
     kie_api_key: str = Field(alias="KIE_API_KEY")
@@ -42,7 +43,11 @@ class Settings(BaseSettings):
     crocopay_secret: str = Field(alias="CROCOPAY_SECRET")
 
     jwt_secret: str = Field(alias="JWT_SECRET")
-    mini_app_auth_max_age_seconds: int = Field(default=86_400, alias="MINI_APP_AUTH_MAX_AGE_SECONDS")
+    jwt_access_token_ttl_seconds: int = Field(default=86_400, alias="JWT_ACCESS_TOKEN_TTL_SECONDS")
+    mini_app_auth_max_age_seconds: int = Field(
+        default=86_400,
+        alias="MINI_APP_AUTH_MAX_AGE_SECONDS",
+    )
 
 
 @lru_cache(maxsize=1)
