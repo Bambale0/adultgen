@@ -1,12 +1,9 @@
-"""Core API application factory.
-
-The initial API only exposes health and version endpoints. Domain routers should be
-registered here as implementation phases are completed.
-"""
+"""Core API application factory."""
 
 from fastapi import FastAPI
 
 from adultgen import __version__
+from adultgen.api.routers import system
 
 
 def create_app() -> FastAPI:
@@ -18,13 +15,7 @@ def create_app() -> FastAPI:
         description="Backend-first platform for Telegram AI media generation.",
     )
 
-    @app.get("/health", tags=["system"])
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
-
-    @app.get("/version", tags=["system"])
-    async def version() -> dict[str, str]:
-        return {"version": __version__}
+    app.include_router(system.router)
 
     return app
 
