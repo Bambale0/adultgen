@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling>=1.26.0"]
+build-backend = "hatchling.build"
+
 [project]
 name = "adultgen"
 version = "0.1.0"
@@ -24,6 +28,9 @@ dev = [
     "ruff>=0.12.0",
     "mypy>=1.16.0",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/adultgen"]
 
 [tool.ruff]
 line-length = 100
