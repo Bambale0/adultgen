@@ -8,6 +8,7 @@ import {
 import { useTelegramMiniAppAuth } from './auth';
 import { CreateFlowStarter } from './createFlow';
 import { PlaceholderPage } from './pages';
+import { ProfileVisibilityPage } from './profilePage';
 import { findRouteByPath, primaryNavRouteIds, routes, type MiniAppRouteId } from './routes';
 import { prepareTelegramViewport } from './telegram';
 
@@ -98,6 +99,8 @@ export function App() {
         />
       ) : activeRoute.id === 'create' ? (
         <CreateFlowStarter accessToken={authState.session.access_token} />
+      ) : activeRoute.id === 'profile' ? (
+        <ProfileVisibilityPage accessToken={authState.session.access_token} />
       ) : (
         <PlaceholderPage routeId={activeRoute.id} />
       )}
