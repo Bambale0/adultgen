@@ -78,6 +78,10 @@ button {
   min-height: 320px;
 }
 
+.adult-gate-card {
+  gap: 18px;
+}
+
 .eyebrow {
   margin: 0 0 10px;
   color: #b9a3ff;
@@ -100,6 +104,20 @@ h1 {
   color: rgba(255, 255, 255, 0.75);
   font-size: 17px;
   line-height: 1.55;
+}
+
+.error-text {
+  color: #ff9b9b;
+}
+
+.primary-button {
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: 18px;
+  color: #111111;
+  background: #ffffff;
+  font-weight: 800;
 }
 
 .bottom-nav {
