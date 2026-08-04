@@ -9,7 +9,13 @@ from adultgen.db.models.generations import GenerationTask, SceneTake
 from adultgen.db.models.media import MediaAsset
 from adultgen.db.models.moderation import ModerationCase
 from adultgen.db.models.payments import PaymentOrder, PaymentWebhookProcessing, PaymentWebhookRaw
-from adultgen.db.models.projects import AvatarProfile, AvatarReference, Project, Scene, SceneReference
+from adultgen.db.models.projects import (
+    AvatarProfile,
+    AvatarReference,
+    Project,
+    Scene,
+    SceneReference,
+)
 from adultgen.db.models.publications import (
     FeedEvent,
     Publication,
