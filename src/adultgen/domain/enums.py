@@ -65,13 +65,31 @@ class GenerationStatus(StrEnum):
 class GenerationOperation(StrEnum):
     IMAGE_TEXT_TO_IMAGE = "image_text_to_image"
     IMAGE_TO_IMAGE = "image_to_image"
-    VIDEO = "video"
+    VIDEO_TEXT_TO_VIDEO = "video_text_to_video"
+    VIDEO_IMAGE_TO_VIDEO_FIRST_FRAME = "video_image_to_video_first_frame"
+    VIDEO_IMAGE_TO_VIDEO_FIRST_LAST_FRAMES = "video_image_to_video_first_last_frames"
+    VIDEO_MULTIMODAL_REFERENCE_TO_VIDEO = "video_multimodal_reference_to_video"
+
+
+class ModelProvider(StrEnum):
+    KIE = "kie"
 
 
 class ModelCode(StrEnum):
     SEEDREAM_5_PRO_TEXT_TO_IMAGE = "seedream-5-pro-text-to-image"
     SEEDREAM_5_PRO_IMAGE_TO_IMAGE = "seedream-5-pro-image-to-image"
     SEEDANCE_2 = "seedance-2.0"
+
+
+class KieProviderModel(StrEnum):
+    SEEDREAM_5_PRO_TEXT_TO_IMAGE = "seedream/5-pro-text-to-image"
+    SEEDREAM_5_PRO_IMAGE_TO_IMAGE = "seedream/5-pro-image-to-image"
+    SEEDANCE_2 = "bytedance/seedance-2"
+
+
+class BillingUnit(StrEnum):
+    GENERATION = "generation"
+    SECOND = "second"
 
 
 class ReferenceRole(StrEnum):
