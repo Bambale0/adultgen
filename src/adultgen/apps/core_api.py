@@ -7,6 +7,7 @@ from adultgen.api.routers import (
     admin,
     adult_consent,
     auth,
+    collections,
     generations,
     profiles,
     system,
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
     app.include_router(adult_consent.router)
     app.include_router(workspace.router)
     app.include_router(profiles.router)
+    app.include_router(collections.router)
     app.include_router(admin.router)
 
     return app
