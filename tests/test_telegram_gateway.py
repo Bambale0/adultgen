@@ -6,6 +6,7 @@ from adultgen.telegram_gateway.security import (
     hash_webhook_secret,
     verify_webhook_secret,
 )
+from adultgen.telegram_gateway.start_payload import StartPayloadKind
 from adultgen.telegram_gateway.updates import TelegramUpdateError, summarize_update
 
 
@@ -42,6 +43,9 @@ def test_summarize_update_extracts_chat_id_and_start_payload() -> None:
     assert summary.update_id == 123
     assert summary.message_chat_id == 456
     assert summary.start_payload == "profile_abc123"
+    assert summary.parsed_start_payload is not None
+    assert summary.parsed_start_payload.kind == StartPayloadKind.PROFILE
+    assert summary.parsed_start_payload.profile_public_id == "abc123"
 
 
 def test_summarize_update_accepts_non_start_messages() -> None:
@@ -58,6 +62,7 @@ def test_summarize_update_accepts_non_start_messages() -> None:
     assert summary.update_id == 123
     assert summary.message_chat_id == 456
     assert summary.start_payload is None
+    assert summary.parsed_start_payload is None
 
 
 def test_summarize_update_rejects_missing_update_id() -> None:
