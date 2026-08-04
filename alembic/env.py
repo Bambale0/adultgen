@@ -5,15 +5,12 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
+import adultgen.db.models  # noqa: F401
+from adultgen.config import get_settings
+from adultgen.db.base import Base
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from adultgen.config import get_settings
-from adultgen.db.base import Base
-
-# Import all models so metadata is populated.
-import adultgen.db.models  # noqa: F401
 
 config = context.config
 
