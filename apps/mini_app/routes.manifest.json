@@ -1,0 +1,72 @@
+[
+  {
+    "id": "home",
+    "path": "/",
+    "title": "Главная",
+    "requiresAuth": true,
+    "requiresAdultConsent": false
+  },
+  {
+    "id": "feed",
+    "path": "/feed",
+    "title": "Лента",
+    "requiresAuth": true,
+    "requiresAdultConsent": true
+  },
+  {
+    "id": "create",
+    "path": "/create",
+    "title": "Создать",
+    "requiresAuth": true,
+    "requiresAdultConsent": false
+  },
+  {
+    "id": "projects",
+    "path": "/projects",
+    "title": "Проекты",
+    "requiresAuth": true,
+    "requiresAdultConsent": false
+  },
+  {
+    "id": "profile",
+    "path": "/profile",
+    "title": "Профиль",
+    "requiresAuth": true,
+    "requiresAdultConsent": false
+  },
+  {
+    "id": "avatars",
+    "path": "/avatars",
+    "title": "Мои аватары",
+    "requiresAuth": true,
+    "requiresAdultConsent": false
+  },
+  {
+    "id": "balance",
+    "path": "/balance",
+    "title": "Баланс",
+    "requiresAuth": true,
+    "requiresAdultConsent": false
+  },
+  {
+    "id": "partner",
+    "path": "/partner",
+    "title": "Партнёрский кабинет",
+    "requiresAuth": true,
+    "requiresAdultConsent": false
+  },
+  {
+    "id": "settings",
+    "path": "/settings",
+    "title": "Настройки / 18+",
+    "requiresAuth": true,
+    "requiresAdultConsent": false
+  },
+  {
+    "id": "support",
+    "path": "/support",
+    "title": "Поддержка",
+    "requiresAuth": true,
+    "requiresAdultConsent": false
+  }
+]
