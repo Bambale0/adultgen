@@ -2,6 +2,13 @@
 
 Telegram-first AI media generation platform with Mini App, multi-reference cinematic workflows, internal credits, partner payouts, moderation, global feed, and replaceable Telegram bot channels.
 
+## Documentation languages
+
+- English documentation entrypoint: [`docs/en/README.md`](docs/en/README.md)
+- Русская документация: [`docs/ru/README.md`](docs/ru/README.md)
+
+Canonical detailed English documents currently live in the root `docs/` directory. Russian companion documents live in `docs/ru/` and must be updated together with the English docs when architecture, model capabilities, billing, safety, or API contracts change.
+
 ## Architecture direction
 
 AdultGen is designed as a backend-first platform:
@@ -35,6 +42,15 @@ AdultGen is designed as a backend-first platform:
 
 ```text
 docs/
+├── en/
+│   └── README.md
+├── ru/
+│   ├── README.md
+│   ├── ARCHITECTURE.md
+│   ├── API_CONTRACTS.md
+│   ├── MODEL_CAPABILITIES.md
+│   ├── OPERATIONAL_FLOWS.md
+│   └── SAFETY_COMPLIANCE.md
 ├── ARCHITECTURE.md
 ├── API_CONTRACTS.md
 ├── DATA_MODEL.md
@@ -74,4 +90,4 @@ curl http://localhost:8000/health
 
 Current branch contains the architecture baseline and initial Python scaffold. Implementation should proceed by phases in `docs/ROADMAP.md`.
 
-Before implementing the generation worker or Mini App creation flow, read `docs/MODEL_CAPABILITIES.md`. It defines the exact Seedream/Seedance operation split, payload mapping, mutual exclusion rules, callback behavior, and provider validation requirements.
+Before implementing the generation worker or Mini App creation flow, read `docs/MODEL_CAPABILITIES.md` and `docs/ru/MODEL_CAPABILITIES.md`. They define the exact Seedream/Seedance operation split, payload mapping, mutual exclusion rules, callback behavior, and provider validation requirements.
