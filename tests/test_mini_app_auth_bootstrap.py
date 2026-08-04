@@ -1,6 +1,4 @@
 from pathlib import Path
-
-
 AUTH_TS = Path("apps/mini_app/src/auth.ts")
 TELEGRAM_TS = Path("apps/mini_app/src/telegram.ts")
 ENV_EXAMPLE = Path("apps/mini_app/.env.example")
