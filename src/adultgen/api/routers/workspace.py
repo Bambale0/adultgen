@@ -1,5 +1,6 @@
 """Workspace API routes."""
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -71,7 +72,7 @@ async def create_workspace_project(
 
 @router.post("/projects/{project_id}/scenes", response_model=SceneResponse)
 async def create_project_scene(
-    project_id: str,
+    project_id: uuid.UUID,
     payload: CreateSceneRequest,
     claims: Annotated[AccessTokenClaims, Depends(get_current_token_claims)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -91,7 +92,7 @@ async def create_project_scene(
             action_notes=payload.action_notes,
             audio_notes=payload.audio_notes,
         )
-    except (ValueError, WorkspaceServiceError) as exc:
+    except WorkspaceServiceError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     return SceneResponse(
