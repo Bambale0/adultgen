@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+
 MANIFEST_PATH = Path("apps/mini_app/routes.manifest.json")
 
 
