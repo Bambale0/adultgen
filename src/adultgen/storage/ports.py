@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
+
+
+@dataclass(frozen=True, slots=True)
+class StoredObject:
+    """Object bytes loaded from storage."""
+
+    body: bytes
+    content_type: str
 
 
 class ObjectStorage(Protocol):
@@ -17,6 +26,15 @@ class ObjectStorage(Protocol):
         content_type: str,
     ) -> None:
         """Persist an object."""
+
+    async def get_object(
+        self,
+        *,
+        bucket: str,
+        key: str,
+        content_type: str,
+    ) -> StoredObject:
+        """Load an object body from storage."""
 
     async def copy_object(
         self,

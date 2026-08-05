@@ -62,6 +62,9 @@ export type Publication = {
   prompt_public: boolean;
   status: string;
   published_at: string;
+  media_url: string;
+  preview_url: string;
+  blur_preview_url: string | null;
 };
 
 export type FeedResponse = {
@@ -112,6 +115,10 @@ export type Profile = {
 };
 
 const CORE_API_URL = import.meta.env.VITE_CORE_API_URL || '/api';
+
+export function coreMediaUrl(path: string): string {
+  return path.startsWith('http') ? path : `${CORE_API_URL}${path}`;
+}
 
 export async function createWebSession(email: string, displayName: string): Promise<WebSession> {
   return request<WebSession>('/auth/web-session', {
