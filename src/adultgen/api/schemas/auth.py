@@ -15,6 +15,14 @@ class TelegramMiniAppAuthRequest(BaseModel):
     start_payload: str | None = Field(default=None, description="Optional /start payload attribution.")
 
 
+class WebSessionAuthRequest(BaseModel):
+    """Website-first auth payload for the standalone web app MVP."""
+
+    email: str = Field(min_length=3, max_length=254, description="Website account email used for the MVP web session.")
+    display_name: str | None = Field(default=None, max_length=80)
+    referral_payload: str | None = Field(default=None, max_length=128)
+
+
 class UserCapabilityResponse(BaseModel):
     """User permission flags needed by Mini App navigation."""
 
@@ -33,3 +41,10 @@ class TelegramMiniAppAuthResponse(BaseModel):
     telegram_user_id: int
     is_blocked: bool
     capabilities: UserCapabilityResponse
+
+
+class WebSessionAuthResponse(TelegramMiniAppAuthResponse):
+    """Successful standalone website auth response."""
+
+    email: str
+    display_name: str
