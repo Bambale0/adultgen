@@ -139,7 +139,10 @@ def parse_kie_callback(payload: dict[str, object]) -> ParsedKieCallback:
     if not provider_task_id:
         raise KieCallbackError("Kie callback is missing provider task id.")
 
-    status = _first_string(payload.get("status"), data.get("status"), payload.get("state"), data.get("state")) or "completed"
+    status = (
+        _first_string(payload.get("status"), data.get("status"), payload.get("state"), data.get("state"))
+        or "completed"
+    )
     result_urls = tuple(_extract_result_urls(payload, data))
     last_frame_url = _first_string(
         payload.get("last_frame_url"),
