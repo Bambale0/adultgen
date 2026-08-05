@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class TelegramMiniAppAuthRequest(BaseModel):
@@ -18,7 +18,7 @@ class TelegramMiniAppAuthRequest(BaseModel):
 class WebSessionAuthRequest(BaseModel):
     """Website-first auth payload for the standalone web app MVP."""
 
-    email: EmailStr = Field(description="Website account email used for the MVP web session.")
+    email: str = Field(min_length=3, max_length=254, description="Website account email used for the MVP web session.")
     display_name: str | None = Field(default=None, max_length=80)
     referral_payload: str | None = Field(default=None, max_length=128)
 
@@ -46,5 +46,5 @@ class TelegramMiniAppAuthResponse(BaseModel):
 class WebSessionAuthResponse(TelegramMiniAppAuthResponse):
     """Successful standalone website auth response."""
 
-    email: EmailStr
+    email: str
     display_name: str
