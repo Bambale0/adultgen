@@ -147,7 +147,7 @@ async def _hide_publication(session: AsyncSession, publication_id: uuid.UUID) ->
     publication = result.scalar_one_or_none()
     if publication is None:
         return
-    publication.status = PublicationStatus.REJECTED.value
+    publication.status = PublicationStatus.HIDDEN.value
     await session.flush()
 
 
