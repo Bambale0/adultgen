@@ -47,3 +47,25 @@ class MediaAsset(Base, CreatedAtMixin):
     is_temporary: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MediaDerivative(Base, CreatedAtMixin):
+    """Derivative relationship for preview and blurred-cover media.
+
+    The derivative object is a normal MediaAsset so delivery/CDN logic stays the same.
+    This table records which asset is the derivative of which original and why.
+    """
+
+    __tablename__ = "media_derivatives"
+    __table_args__ = (UniqueConstraint("source_asset_id", "variant"),)
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    source_asset_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media_assets.id"), nullable=False
+    )
+    derivative_asset_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media_assets.id"), nullable=False
+    )
+    variant: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, default="ready", nullable=False)
+    processor_version: Mapped[str] = mapped_column(Text, default="copy-placeholder-v1", nullable=False)
