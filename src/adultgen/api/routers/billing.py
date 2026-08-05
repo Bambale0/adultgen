@@ -23,7 +23,12 @@ from adultgen.integrations.payments.crocopay import (
     initiate_crocopay_payment,
 )
 from adultgen.security.tokens import AccessTokenClaims
-from adultgen.services.billing import BillingServiceError, attach_provider_checkout, create_payment_order, get_payment_order_for_update
+from adultgen.services.billing import (
+    BillingServiceError,
+    attach_provider_checkout,
+    create_payment_order,
+    get_payment_order_for_update,
+)
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -74,13 +79,20 @@ async def initiate_crocopay_checkout(
     if order.user_id != claims.subject:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Payment order is not owned by user.")
     if order.provider != PaymentProviderCode.CROCOPAY.value:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Payment order provider is not CrocoPay.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Payment order provider is not CrocoPay.",
+        )
 
     client_id = settings.crocopay_client_id or settings.crocopay_api_key
     client_secret = settings.crocopay_client_secret or settings.crocopay_secret
     if not client_id or not client_secret:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="CrocoPay credentials are not configured.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="CrocoPay credentials are not configured.",
+        )
 
+    base_url = settings.billing_base_url.rstrip("/")
     try:
         checkout = await initiate_crocopay_payment(
             api_base_url=settings.crocopay_api_base_url,
@@ -89,9 +101,9 @@ async def initiate_crocopay_checkout(
                 client_secret=client_secret,
                 amount_minor=order.amount_minor,
                 currency=order.currency,
-                success_url=f"{settings.billing_base_url.rstrip('/')}/billing/success?order_id={order.id}",
-                cancel_url=f"{settings.billing_base_url.rstrip('/')}/billing/cancel?order_id={order.id}",
-                callback_url=f"{settings.billing_base_url.rstrip('/')}/webhooks/payments/crocopay?order_id={order.id}",
+                success_url=f"{base_url}/billing/success?order_id={order.id}",
+                cancel_url=f"{base_url}/billing/cancel?order_id={order.id}",
+                callback_url=f"{base_url}/webhooks/payments/crocopay?order_id={order.id}",
             ),
         )
         updated_order = await attach_provider_checkout(session, order_id=order.id, checkout=checkout)
