@@ -1,16 +1,20 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 
 import {
   acceptAdultConsent,
+  coreMediaUrl,
   createGenerationTask,
   createPublication,
   createStarterWorkspace,
   createWebSession,
   fetchAdultConsent,
   fetchFeed,
+  fetchGenerationTask,
+  fetchMyGenerations,
   fetchMyProfile,
   fetchMyPublications,
   fetchSavedCollection,
+  importExternalMedia,
   savePublication,
   updateMyProfile,
   uploadReferenceMedia,
@@ -18,6 +22,7 @@ import {
   type AdultConsentStatus,
   type FeedResponse,
   type GenerationMode,
+  type GenerationResultAsset,
   type GenerationTask,
   type MediaAsset,
   type Profile,
@@ -69,6 +74,7 @@ export function App() {
   const [adultConsent, setAdultConsent] = useState<AdultConsentStatus | null>(() => loadAdultConsentStatus());
   const [workspace, setWorkspace] = useState<WorkspaceDraft | null>(null);
   const [latestTask, setLatestTask] = useState<GenerationTask | null>(null);
+  const [generationTasks, setGenerationTasks] = useState<GenerationTask[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [studio, setStudio] = useState<StudioState>(defaultStudioState);
   const [uploadedAssets, setUploadedAssets] = useState<MediaAsset[]>([]);
@@ -84,6 +90,23 @@ export function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const routeBlockedByAuth = activeRoute.requiresAuth && !session;
   const routeBlockedByAge = activeRoute.requiresAdultConsent && !adultConsent?.accepted;
+
+  useEffect(() => {
+    if (!session || !adultConsent?.accepted) return;
+
+    let ignore = false;
+    fetchMyGenerations(session.access_token)
+      .then((result) => {
+        if (!ignore) setGenerationTasks(result.items);
+      })
+      .catch(() => {
+        if (!ignore) setGenerationTasks([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [session, adultConsent?.accepted]);
 
   async function runAction<T>(message: string, action: () => Promise<T>): Promise<T | null> {
     setStatusMessage(message);
@@ -147,7 +170,65 @@ export function App() {
         scene_id: workspace?.scene_id,
       }),
     );
-    if (result) setLatestTask(result);
+    if (!result) return;
+    setLatestTask(result);
+    setGenerationTasks((items) => [result, ...items.filter((item) => item.id !== result.id)]);
+  }
+
+  async function handleRefreshLatestTask() {
+    if (!session || !latestTask) return;
+    const result = await runAction('Обновляем статус последней задачи…', () =>
+      fetchGenerationTask(session.access_token, latestTask.id),
+    );
+    if (!result) return;
+    setLatestTask(result);
+    setGenerationTasks((items) => [result, ...items.filter((item) => item.id !== result.id)]);
+  }
+
+  async function handleRefreshGenerationTasks() {
+    if (!session) return;
+    const result = await runAction('Загружаем последние генерации…', () => fetchMyGenerations(session.access_token));
+    if (result) setGenerationTasks(result.items);
+  }
+
+  async function handleImportResultAsset(assetId: string, taskId?: string) {
+    if (!session) return;
+    const result = await runAction('Импортируем provider media в storage…', () =>
+      importExternalMedia(session.access_token, assetId),
+    );
+    if (!result) return;
+
+    const refreshedTaskId = taskId ?? latestTask?.id;
+    if (refreshedTaskId) {
+      const refreshedTask = await fetchGenerationTask(session.access_token, refreshedTaskId);
+      setLatestTask((current) => (current?.id === refreshedTask.id ? refreshedTask : current));
+      setGenerationTasks((items) => [refreshedTask, ...items.filter((item) => item.id !== refreshedTask.id)]);
+    }
+  }
+
+  async function handlePublishResultAsset(asset: GenerationResultAsset) {
+    if (!session) return;
+    if (asset.is_external) {
+      setErrorMessage('Сначала импортируй external result media в storage.');
+      return;
+    }
+
+    const publication = await runAction('Публикуем result asset…', () =>
+      createPublication(session.access_token, {
+        asset_id: asset.asset_id,
+        title: publishTitle || 'Generated result',
+        description: publishDescription || 'Generated from AdultGen website app.',
+        visibility: publishVisibility,
+        is_explicit: true,
+        blur_required: true,
+        allow_remix: true,
+        prompt_public: false,
+        project_id: workspace?.project_id ?? null,
+      }),
+    );
+    if (!publication) return;
+    setMyPublications((items) => [publication, ...items]);
+    if (publication.visibility === 'feed') setFeed((current) => ({ items: [publication, ...current.items] }));
   }
 
   async function handleUploadMedia(event: ChangeEvent<HTMLInputElement>, kind: 'temporary' | 'reference') {
@@ -236,6 +317,7 @@ export function App() {
     setAdultConsent(null);
     setWorkspace(null);
     setLatestTask(null);
+    setGenerationTasks([]);
     setProfile(null);
     setUploadedAssets([]);
     setMyPublications([]);
@@ -306,9 +388,14 @@ export function App() {
             setStudio={setStudio}
             workspace={workspace}
             latestTask={latestTask}
+            generationTasks={generationTasks}
             uploadedAssets={uploadedAssets}
             onPrepareWorkspace={() => void handlePrepareWorkspace()}
             onLaunch={() => void handleLaunchGeneration()}
+            onRefreshLatestTask={() => void handleRefreshLatestTask()}
+            onRefreshGenerationTasks={() => void handleRefreshGenerationTasks()}
+            onImportResultAsset={(assetId, taskId) => void handleImportResultAsset(assetId, taskId)}
+            onPublishResultAsset={(asset) => void handlePublishResultAsset(asset)}
             onUploadReference={(event) => void handleUploadMedia(event, 'reference')}
             onUploadTemporary={(event) => void handleUploadMedia(event, 'temporary')}
             onPublishLatestAsset={() => void handlePublishLatestAsset()}
@@ -462,9 +549,14 @@ function StudioCard({
   setStudio,
   workspace,
   latestTask,
+  generationTasks,
   uploadedAssets,
   onPrepareWorkspace,
   onLaunch,
+  onRefreshLatestTask,
+  onRefreshGenerationTasks,
+  onImportResultAsset,
+  onPublishResultAsset,
   onUploadReference,
   onUploadTemporary,
   onPublishLatestAsset,
@@ -479,9 +571,14 @@ function StudioCard({
   setStudio: (value: StudioState) => void;
   workspace: WorkspaceDraft | null;
   latestTask: GenerationTask | null;
+  generationTasks: GenerationTask[];
   uploadedAssets: MediaAsset[];
   onPrepareWorkspace: () => void;
   onLaunch: () => void;
+  onRefreshLatestTask: () => void;
+  onRefreshGenerationTasks: () => void;
+  onImportResultAsset: (assetId: string, taskId?: string) => void;
+  onPublishResultAsset: (asset: GenerationResultAsset) => void;
   onUploadReference: (event: ChangeEvent<HTMLInputElement>) => void;
   onUploadTemporary: (event: ChangeEvent<HTMLInputElement>) => void;
   onPublishLatestAsset: () => void;
@@ -613,11 +710,154 @@ function StudioCard({
           <button className="primary-button" type="button" onClick={onLaunch}>
             Запустить генерацию
           </button>
+          <button className="ghost-button" type="button" onClick={onRefreshLatestTask} disabled={!latestTask}>
+            Обновить последнюю задачу
+          </button>
         </div>
         {workspace && <CodeBlock value={JSON.stringify(workspace, null, 2)} />}
-        {latestTask && <CodeBlock value={JSON.stringify(latestTask, null, 2)} />}
+        {latestTask && <GenerationTaskCard task={latestTask} compact />}
       </aside>
+
+      <GenerationResultsPanel
+        tasks={generationTasks}
+        onRefresh={onRefreshGenerationTasks}
+        onImportResultAsset={onImportResultAsset}
+        onPublishResultAsset={onPublishResultAsset}
+      />
     </section>
+  );
+}
+
+function GenerationResultsPanel({
+  tasks,
+  onRefresh,
+  onImportResultAsset,
+  onPublishResultAsset,
+}: {
+  tasks: GenerationTask[];
+  onRefresh: () => void;
+  onImportResultAsset: (assetId: string, taskId?: string) => void;
+  onPublishResultAsset: (asset: GenerationResultAsset) => void;
+}) {
+  return (
+    <section className="card stack-card results-panel">
+      <div className="section-heading-row">
+        <div>
+          <p className="eyebrow">Generation history</p>
+          <h3>Результаты генераций</h3>
+        </div>
+        <button className="ghost-button" type="button" onClick={onRefresh}>
+          Обновить список
+        </button>
+      </div>
+      <p>
+        После Kie callback здесь появятся result assets. External assets сначала импортируются в storage,
+        потом их можно публиковать в профиль или общую ленту.
+      </p>
+      {tasks.length === 0 ? (
+        <p className="muted-text">Пока нет generation tasks. Запусти генерацию или обнови список.</p>
+      ) : (
+        <div className="generation-grid">
+          {tasks.map((task) => (
+            <GenerationTaskCard
+              key={task.id}
+              task={task}
+              onImportResultAsset={(assetId) => onImportResultAsset(assetId, task.id)}
+              onPublishResultAsset={onPublishResultAsset}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function GenerationTaskCard({
+  task,
+  compact = false,
+  onImportResultAsset,
+  onPublishResultAsset,
+}: {
+  task: GenerationTask;
+  compact?: boolean;
+  onImportResultAsset?: (assetId: string) => void;
+  onPublishResultAsset?: (asset: GenerationResultAsset) => void;
+}) {
+  return (
+    <article className="generation-card">
+      <div className="generation-card-head">
+        <div>
+          <strong>{task.operation}</strong>
+          <small>{task.id}</small>
+        </div>
+        <span className={`task-status ${task.status}`}>{task.status}</span>
+      </div>
+      <div className="guard-grid">
+        <GuardPill label={`${task.reserved_credits} reserved`} enabled />
+        <GuardPill label={`${task.charged_credits} charged`} enabled={task.charged_credits > 0} />
+        <GuardPill label={task.provider_task_id ? 'provider id' : 'no provider id'} enabled={Boolean(task.provider_task_id)} />
+      </div>
+      {task.error_message && <p className="muted-text">{task.error_code}: {task.error_message}</p>}
+      {!compact && (
+        <ResultAssetList
+          assets={task.results}
+          onImport={onImportResultAsset}
+          onPublish={onPublishResultAsset}
+        />
+      )}
+    </article>
+  );
+}
+
+function ResultAssetList({
+  assets,
+  onImport,
+  onPublish,
+}: {
+  assets: GenerationResultAsset[];
+  onImport?: (assetId: string) => void;
+  onPublish?: (asset: GenerationResultAsset) => void;
+}) {
+  if (assets.length === 0) return <p className="muted-text">Результатов пока нет: ждём callback от провайдера.</p>;
+  return (
+    <div className="result-list">
+      {assets.map((asset) => (
+        <div className="result-card" key={`${asset.role}-${asset.asset_id}`}>
+          <div className="result-preview">
+            {asset.role === 'video' ? (
+              <video controls preload="metadata" src={coreMediaUrl(asset.media_url)} />
+            ) : (
+              <img alt={`${asset.role} result`} src={coreMediaUrl(asset.media_url)} />
+            )}
+          </div>
+          <div className="result-meta">
+            <strong>{asset.role}</strong>
+            <small>{asset.asset_id}</small>
+            <GuardPill label={asset.is_external ? 'external' : 'stored'} enabled={!asset.is_external} />
+            <div className="button-row">
+              {asset.is_external && onImport && (
+                <button className="ghost-button small-button" type="button" onClick={() => onImport(asset.asset_id)}>
+                  Импортировать
+                </button>
+              )}
+              {onPublish && (
+                <button
+                  className="primary-button small-button"
+                  type="button"
+                  disabled={asset.is_external}
+                  onClick={() => onPublish(asset)}
+                >
+                  Опубликовать
+                </button>
+              )}
+              <a className="text-link" href={coreMediaUrl(asset.media_url)} target="_blank" rel="noreferrer">
+                Открыть media
+              </a>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -724,6 +964,9 @@ function PublicationList({ publications, onSave }: { publications: Publication[]
           <strong>{publication.title || 'Untitled publication'}</strong>
           <span>{publication.visibility} · {publication.status} · asset {publication.asset_id}</span>
           <small>{publication.blur_required ? 'blur required' : 'no blur'} · remix {publication.allow_remix ? 'on' : 'off'}</small>
+          {publication.preview_url && (
+            <img className="publication-preview" alt={publication.title || 'Publication preview'} src={coreMediaUrl(publication.preview_url)} />
+          )}
           {onSave && (
             <button className="ghost-button small-button" type="button" onClick={() => onSave(publication.id)}>
               В коллекцию
