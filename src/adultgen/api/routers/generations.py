@@ -46,6 +46,7 @@ async def create_generation_task(
             decision=policy_decision,
             surface="generation_submit",
         )
+        await session.commit()
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Generation request violates adult content policy.",
