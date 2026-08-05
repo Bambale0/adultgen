@@ -23,9 +23,11 @@ class Settings(BaseSettings):
     database_url: str = Field(alias="DATABASE_URL")
     redis_url: str = Field(alias="REDIS_URL")
 
+    object_storage_backend: str = Field(default="local", alias="OBJECT_STORAGE_BACKEND")
     s3_endpoint_url: str = Field(alias="S3_ENDPOINT_URL")
     s3_access_key: str = Field(alias="S3_ACCESS_KEY")
     s3_secret_key: str = Field(alias="S3_SECRET_KEY")
+    s3_region_name: str = Field(default="us-east-1", alias="S3_REGION_NAME")
     s3_temp_bucket: str = Field(default="media-temporary", alias="S3_TEMP_BUCKET")
     s3_published_bucket: str = Field(default="media-published", alias="S3_PUBLISHED_BUCKET")
     s3_references_bucket: str = Field(default="media-references", alias="S3_REFERENCES_BUCKET")
