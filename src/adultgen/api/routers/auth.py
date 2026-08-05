@@ -10,6 +10,8 @@ from adultgen.api.schemas.auth import (
     TelegramMiniAppAuthRequest,
     TelegramMiniAppAuthResponse,
     UserCapabilityResponse,
+    WebSessionAuthRequest,
+    WebSessionAuthResponse,
 )
 from adultgen.config import Settings
 from adultgen.integrations.telegram.mini_app_auth import (
@@ -23,6 +25,7 @@ from adultgen.services.users import (
     get_active_telegram_channel,
     record_user_channel_activity,
     upsert_user_from_telegram,
+    upsert_user_from_web_session,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -75,10 +78,58 @@ async def authenticate_telegram_mini_app(
         user_id=user.id,
         telegram_user_id=user.telegram_user_id,
         is_blocked=user.is_blocked,
-        capabilities=UserCapabilityResponse(
-            can_generate=user.can_generate,
-            can_publish_profile=user.can_publish_profile,
-            can_publish_feed=user.can_publish_feed,
-            can_use_payments=user.can_use_payments,
-        ),
+        capabilities=_capabilities_response(user),
+    )
+
+
+@router.post("/web-session", response_model=WebSessionAuthResponse)
+async def authenticate_web_session(
+    payload: WebSessionAuthRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_runtime_settings)],
+) -> WebSessionAuthResponse:
+    """Authenticate the standalone website app and return a Core API token.
+
+    This MVP endpoint intentionally keeps the website independent from Telegram.
+    Production can replace it with email OTP, wallet login, OAuth, or another
+    identity provider without changing the web app's Core token contract.
+    """
+
+    try:
+        user = await upsert_user_from_web_session(
+            session,
+            email=str(payload.email),
+            display_name=payload.display_name,
+        )
+    except UserServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    access_token = create_access_token(
+        subject=user.id,
+        telegram_user_id=user.telegram_user_id,
+        secret=settings.jwt_secret,
+        ttl_seconds=settings.jwt_access_token_ttl_seconds,
+    )
+
+    display_name = payload.display_name or str(payload.email).split("@", maxsplit=1)[0]
+    return WebSessionAuthResponse(
+        access_token=access_token,
+        user_id=user.id,
+        telegram_user_id=user.telegram_user_id,
+        is_blocked=user.is_blocked,
+        capabilities=_capabilities_response(user),
+        email=payload.email,
+        display_name=display_name,
+    )
+
+
+def _capabilities_response(user: object) -> UserCapabilityResponse:
+    return UserCapabilityResponse(
+        can_generate=getattr(user, "can_generate"),
+        can_publish_profile=getattr(user, "can_publish_profile"),
+        can_publish_feed=getattr(user, "can_publish_feed"),
+        can_use_payments=getattr(user, "can_use_payments"),
     )
