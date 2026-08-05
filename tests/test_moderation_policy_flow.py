@@ -57,7 +57,8 @@ def test_generation_and_publication_routes_use_policy_checks() -> None:
     assert "create_policy_moderation_case" in generations
     assert "await session.commit()" in generations
     assert "evaluate_request_payload" in publications
-    assert "blur_required = payload.blur_required or payload.is_explicit or policy_decision.needs_review" in publications
+    assert "blur_required = payload.blur_required or payload.is_explicit" in publications
+    assert "policy_decision.needs_review" in publications
     assert "publication_id=publication.id" in publications
 
 
