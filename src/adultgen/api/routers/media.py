@@ -1,7 +1,7 @@
 """Media upload and delivery API routes."""
 
-from typing import Annotated
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile, status
 from sqlalchemy import select
