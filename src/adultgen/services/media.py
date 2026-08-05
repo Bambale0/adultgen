@@ -17,8 +17,8 @@ from adultgen.domain.media_storage import (
     BucketNames,
     MediaBucketRole,
     MediaStorageError,
-    guess_media_type,
     guess_mime_type,
+    infer_media_type,
     plan_media_object,
 )
 from adultgen.storage.ports import ObjectStorage
@@ -107,7 +107,7 @@ async def register_external_media_asset(
     resolved_now = now or datetime.now(UTC)
     resolved_filename = filename or parsed.path.rsplit("/", maxsplit=1)[-1] or "provider-result"
     resolved_mime_type = mime_type or guess_mime_type(resolved_filename)
-    media_type = guess_media_type(resolved_mime_type)
+    media_type = infer_media_type(resolved_mime_type)
     url_hash = hashlib.sha256(external_url.encode("utf-8")).hexdigest()
     storage_key = f"external/{url_hash}/{resolved_filename}"
 
