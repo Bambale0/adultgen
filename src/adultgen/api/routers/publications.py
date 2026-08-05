@@ -86,6 +86,7 @@ async def list_my_profile_publications(
 
 
 def _publication_response(publication: object) -> PublicationResponse:
+    media_url = f"/media/assets/{publication.asset_id}/content"
     return PublicationResponse(
         id=publication.id,
         user_id=publication.user_id,
@@ -101,4 +102,7 @@ def _publication_response(publication: object) -> PublicationResponse:
         prompt_public=publication.prompt_public,
         status=publication.status,
         published_at=publication.published_at,
+        media_url=media_url,
+        preview_url=f"{media_url}?variant=preview",
+        blur_preview_url=f"{media_url}?variant=blur" if publication.blur_required else None,
     )
