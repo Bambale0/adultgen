@@ -19,6 +19,15 @@ class CreateGenerationTaskRequest(BaseModel):
     scene_id: uuid.UUID | None = None
 
 
+class GenerationResultAssetResponse(BaseModel):
+    """A media result attached to a generation task."""
+
+    asset_id: uuid.UUID
+    role: str
+    media_url: str
+    is_external: bool
+
+
 class GenerationTaskResponse(BaseModel):
     """Generation task state returned to API clients."""
 
@@ -32,3 +41,10 @@ class GenerationTaskResponse(BaseModel):
     provider_task_id: str | None = None
     error_code: str | None = None
     error_message: str | None = None
+    results: list[GenerationResultAssetResponse] = Field(default_factory=list)
+
+
+class GenerationListResponse(BaseModel):
+    """Current user's generation task list."""
+
+    items: list[GenerationTaskResponse]
