@@ -9,6 +9,8 @@ export type AdminUser = {
   can_publish_profile: boolean;
   can_publish_feed: boolean;
   can_use_payments: boolean;
+  cached_available_balance: number | null;
+  cached_reserved_balance: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -16,48 +18,58 @@ export type AdminUser = {
 export type AdminGeneration = {
   id: string;
   user_id: string;
+  status: string;
   provider: string;
   model_code: string;
   operation: string;
-  status: string;
-  provider_task_id: string | null;
   reserved_credits: number;
   charged_credits: number;
+  provider_task_id: string | null;
   error_code: string | null;
   error_message: string | null;
   created_at: string;
-  submitted_at: string | null;
-  completed_at: string | null;
+  updated_at: string;
 };
 
 export type AdminPublication = {
   id: string;
   user_id: string;
   asset_id: string;
-  title: string | null;
   visibility: string;
+  status: string;
+  title: string | null;
+  description: string | null;
   is_explicit: boolean;
   blur_required: boolean;
-  status: string;
-  published_at: string;
+  published_at: string | null;
   deleted_at: string | null;
+  media_url: string;
 };
 
 export type AdminPaymentOrder = {
   id: string;
   user_id: string;
   provider: string;
+  external_payment_id: string | null;
   package_code: string;
   amount_minor: number;
   currency: string;
   credits_amount: number;
   status: string;
-  external_payment_id: string | null;
-  provider_checkout_url: string | null;
   expires_at: string;
   paid_at: string | null;
+  provider_checkout_url: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AdminWalletAdjustment = {
+  user_id: string;
+  operation_id: string;
+  amount: number;
+  bucket: string;
+  total_available: number;
+  total_reserved: number;
 };
 
 export type AdminAuditEvent = {
@@ -72,72 +84,97 @@ export type AdminAuditEvent = {
   created_at: string;
 };
 
-export type AdminWalletAdjustment = {
-  user_id: string;
-  amount: number;
-  bucket: string;
-  total_available: number;
-  total_reserved: number;
-};
-
 const CORE_API_URL = import.meta.env.VITE_CORE_API_URL || '/api';
 
-export async function fetchAdminUsers(adminToken: string): Promise<{ items: AdminUser[] }> {
-  return adminRequest<{ items: AdminUser[] }>('/admin/users', adminToken);
+export async function fetchAdminUsers(adminToken: string, limit = 50): Promise<{ items: AdminUser[] }> {
+  return adminRequest(`/admin/users?limit=${limit}`, adminToken);
 }
 
-export async function patchAdminUserFlags(
+export async function updateAdminUserCapabilities(
   adminToken: string,
   userId: string,
-  payload: Partial<Pick<AdminUser, 'is_blocked' | 'can_generate' | 'can_publish_profile' | 'can_publish_feed' | 'can_use_payments'>> & {
+  payload: {
+    is_blocked?: boolean;
+    can_generate?: boolean;
+    can_publish_profile?: boolean;
+    can_publish_feed?: boolean;
+    can_use_payments?: boolean;
     reason: string;
-    admin_user_id?: string | null;
   },
 ): Promise<AdminUser> {
-  return adminRequest<AdminUser>(`/admin/users/${userId}/flags`, adminToken, {
+  return adminRequest(`/admin/users/${userId}/capabilities`, adminToken, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
 
-export async function fetchAdminGenerations(adminToken: string): Promise<{ items: AdminGeneration[] }> {
-  return adminRequest<{ items: AdminGeneration[] }>('/admin/generations', adminToken);
+export async function fetchAdminGenerations(
+  adminToken: string,
+  limit = 50,
+  status?: string,
+): Promise<{ items: AdminGeneration[] }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (status) params.set('status', status);
+  return adminRequest(`/admin/generations?${params.toString()}`, adminToken);
 }
 
-export async function fetchAdminPublications(adminToken: string): Promise<{ items: AdminPublication[] }> {
-  return adminRequest<{ items: AdminPublication[] }>('/admin/publications', adminToken);
+export async function fetchAdminPublications(
+  adminToken: string,
+  limit = 50,
+  status?: string,
+): Promise<{ items: AdminPublication[] }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (status) params.set('status', status);
+  return adminRequest(`/admin/publications?${params.toString()}`, adminToken);
 }
 
-export async function patchAdminPublicationStatus(
+export async function applyAdminPublicationAction(
   adminToken: string,
   publicationId: string,
-  payload: { status: string; reason: string; admin_user_id?: string | null },
+  action: 'hide' | 'restore' | 'delete',
+  reason: string,
 ): Promise<AdminPublication> {
-  return adminRequest<AdminPublication>(`/admin/publications/${publicationId}/status`, adminToken, {
-    method: 'PATCH',
-    body: JSON.stringify(payload),
+  return adminRequest(`/admin/publications/${publicationId}/actions`, adminToken, {
+    method: 'POST',
+    body: JSON.stringify({ action, reason }),
   });
 }
 
-export async function fetchAdminPaymentOrders(adminToken: string): Promise<{ items: AdminPaymentOrder[] }> {
-  return adminRequest<{ items: AdminPaymentOrder[] }>('/admin/payments/orders', adminToken);
+export async function fetchAdminPaymentOrders(
+  adminToken: string,
+  limit = 50,
+  status?: string,
+): Promise<{ items: AdminPaymentOrder[] }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (status) params.set('status', status);
+  return adminRequest(`/admin/payments/orders?${params.toString()}`, adminToken);
 }
 
 export async function createAdminWalletAdjustment(
   adminToken: string,
-  payload: { user_id: string; amount: number; bucket: string; reason: string; admin_user_id?: string | null },
+  payload: {
+    user_id: string;
+    amount: number;
+    bucket: 'purchased' | 'subscription' | 'bonus';
+    reason: string;
+    admin_user_id?: string | null;
+  },
 ): Promise<AdminWalletAdjustment> {
-  return adminRequest<AdminWalletAdjustment>('/admin/wallet-adjustments', adminToken, {
+  return adminRequest('/admin/wallet/adjustments', adminToken, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
-export async function fetchAdminAuditEvents(adminToken: string): Promise<{ items: AdminAuditEvent[] }> {
-  return adminRequest<{ items: AdminAuditEvent[] }>('/admin/audit-events', adminToken);
+export async function fetchAdminAuditEvents(adminToken: string, limit = 50): Promise<{ items: AdminAuditEvent[] }> {
+  return adminRequest(`/admin/audit/events?limit=${limit}`, adminToken);
 }
 
-async function adminRequest<T>(path: string, adminToken: string, options: RequestInit = {}): Promise<T> {
+async function adminRequest<T = unknown>(
+  path: string,
+  adminToken: string,
+  options: RequestInit = {},
+): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set('Content-Type', 'application/json');
   headers.set('Authorization', `Bearer ${adminToken}`);
