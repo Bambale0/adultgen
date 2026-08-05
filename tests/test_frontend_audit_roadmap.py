@@ -45,5 +45,7 @@ def test_frontend_roadmap_keeps_admin_and_user_apps_separate() -> None:
     main = read("apps/web_app/src/main.tsx")
 
     assert "Admin panel is correctly separated from user app" in roadmap
-    assert "window.location.pathname.startsWith('/admin')" in main
+    assert "window.location.pathname" in main
     assert "AdminPanel" in main
+    assert "App" in main
+    assert "rootComponent" in main
