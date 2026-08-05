@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,23 +17,28 @@ from adultgen.api.schemas.admin import (
     AdminGenerationResponse,
     AdminPaymentOrderListResponse,
     AdminPaymentOrderResponse,
+    AdminPublicationActionRequest,
     AdminPublicationListResponse,
     AdminPublicationResponse,
-    AdminPublicationStatusRequest,
-    AdminUserFlagsPatchRequest,
+    AdminUserCapabilityUpdateRequest,
     AdminUserListResponse,
     AdminUserResponse,
     AdminWalletAdjustmentRequest,
     AdminWalletAdjustmentResponse,
 )
-from adultgen.db.models.audit import AdminAuditEvent
-from adultgen.db.models.generations import GenerationTask
-from adultgen.db.models.payments import PaymentOrder
-from adultgen.db.models.publications import Publication
-from adultgen.db.models.users import User
-from adultgen.domain.enums import CreditBucket, PublicationStatus, WalletEntryType
-from adultgen.services.admin_audit import record_admin_audit_event
-from adultgen.services.wallets import credit_wallet
+from adultgen.db.models.wallets import Wallet
+from adultgen.domain.enums import CreditBucket
+from adultgen.services.admin import (
+    AdminServiceError,
+    adjust_user_wallet,
+    apply_publication_admin_action,
+    list_admin_audit_events,
+    list_admin_generations,
+    list_admin_payment_orders,
+    list_admin_publications,
+    list_admin_users,
+    update_user_capabilities,
+)
 
 router = APIRouter(
     prefix="/admin",
@@ -51,224 +55,196 @@ async def admin_health(_admin: Annotated[None, Depends(require_admin_api_token)]
 
 
 @router.get("/users", response_model=AdminUserListResponse)
-async def list_admin_users(
+async def admin_list_users(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    blocked: bool | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    blocked: bool | None = None,
 ) -> AdminUserListResponse:
-    """List users for admin review."""
+    """List users with cached wallet projections."""
 
-    query = select(User).order_by(User.created_at.desc()).limit(limit)
-    if blocked is not None:
-        query = query.where(User.is_blocked == blocked)
-    result = await session.execute(query)
-    return AdminUserListResponse(items=[_user_response(user) for user in result.scalars()])
+    try:
+        users = await list_admin_users(session, limit=limit, blocked=blocked)
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-
-@router.get("/users/{user_id}", response_model=AdminUserResponse)
-async def get_admin_user(
-    user_id: uuid.UUID,
-    session: Annotated[AsyncSession, Depends(get_db_session)],
-) -> AdminUserResponse:
-    """Return one user for admin review."""
-
-    user = await _get_user_or_404(session, user_id)
-    return _user_response(user)
-
-
-@router.patch("/users/{user_id}/flags", response_model=AdminUserResponse)
-async def patch_admin_user_flags(
-    user_id: uuid.UUID,
-    payload: AdminUserFlagsPatchRequest,
-    session: Annotated[AsyncSession, Depends(get_db_session)],
-) -> AdminUserResponse:
-    """Patch user moderation/capability flags."""
-
-    user = await _get_user_or_404(session, user_id)
-    before = _user_flag_state(user)
-    patch = payload.model_dump(exclude={"reason", "admin_user_id"}, exclude_none=True)
-    if not patch:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No flags supplied.")
-
-    for field, value in patch.items():
-        setattr(user, field, value)
-    await session.flush()
-    after = _user_flag_state(user)
-    await record_admin_audit_event(
-        session,
-        admin_user_id=payload.admin_user_id,
-        target_type="user",
-        target_id=user.id,
-        action="patch_user_flags",
-        reason=payload.reason,
-        before_state=before,
-        after_state=after,
+    wallet_map = await _wallets_by_user_id(session, [user.id for user in users])
+    return AdminUserListResponse(
+        items=[_admin_user_response(user, wallet_map.get(user.id)) for user in users]
     )
-    return _user_response(user)
+
+
+@router.patch("/users/{user_id}/capabilities", response_model=AdminUserResponse)
+async def admin_update_user_capabilities(
+    user_id: uuid.UUID,
+    payload: AdminUserCapabilityUpdateRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AdminUserResponse:
+    """Update user capability flags and audit the change."""
+
+    try:
+        user = await update_user_capabilities(
+            session,
+            user_id=user_id,
+            reason=payload.reason,
+            is_blocked=payload.is_blocked,
+            can_generate=payload.can_generate,
+            can_publish_profile=payload.can_publish_profile,
+            can_publish_feed=payload.can_publish_feed,
+            can_use_payments=payload.can_use_payments,
+        )
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    wallet_map = await _wallets_by_user_id(session, [user.id])
+    return _admin_user_response(user, wallet_map.get(user.id))
 
 
 @router.get("/generations", response_model=AdminGenerationListResponse)
-async def list_admin_generations(
+async def admin_list_generations(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    user_id: uuid.UUID | None = None,
-    task_status: str | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    status_filter: str | None = Query(default=None, alias="status"),
+    user_id: uuid.UUID | None = None,
 ) -> AdminGenerationListResponse:
-    """List generation tasks for support/debugging."""
+    """List generation tasks across users."""
 
-    query = select(GenerationTask).order_by(GenerationTask.created_at.desc()).limit(limit)
-    if user_id is not None:
-        query = query.where(GenerationTask.user_id == user_id)
-    if task_status is not None:
-        query = query.where(GenerationTask.status == task_status)
-    result = await session.execute(query)
-    return AdminGenerationListResponse(items=[_generation_response(task) for task in result.scalars()])
+    try:
+        tasks = await list_admin_generations(
+            session,
+            limit=limit,
+            status=status_filter,
+            user_id=user_id,
+        )
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return AdminGenerationListResponse(items=[_admin_generation_response(task) for task in tasks])
 
 
 @router.get("/publications", response_model=AdminPublicationListResponse)
-async def list_admin_publications(
+async def admin_list_publications(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    publication_status: str | None = None,
-    visibility: str | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    status_filter: str | None = Query(default=None, alias="status"),
+    visibility: str | None = None,
+    user_id: uuid.UUID | None = None,
 ) -> AdminPublicationListResponse:
-    """List publications for moderation/support."""
+    """List publications across users."""
 
-    query = select(Publication).order_by(Publication.published_at.desc()).limit(limit)
-    if publication_status is not None:
-        query = query.where(Publication.status == publication_status)
-    if visibility is not None:
-        query = query.where(Publication.visibility == visibility)
-    result = await session.execute(query)
-    return AdminPublicationListResponse(items=[_publication_response(item) for item in result.scalars()])
+    try:
+        publications = await list_admin_publications(
+            session,
+            limit=limit,
+            status=status_filter,
+            visibility=visibility,
+            user_id=user_id,
+        )
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return AdminPublicationListResponse(
+        items=[_admin_publication_response(publication) for publication in publications]
+    )
 
 
-@router.patch("/publications/{publication_id}/status", response_model=AdminPublicationResponse)
-async def patch_admin_publication_status(
+@router.post("/publications/{publication_id}/actions", response_model=AdminPublicationResponse)
+async def admin_apply_publication_action(
     publication_id: uuid.UUID,
-    payload: AdminPublicationStatusRequest,
+    payload: AdminPublicationActionRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AdminPublicationResponse:
-    """Change publication moderation status."""
+    """Apply hide/restore/delete action to a publication and audit it."""
 
-    publication = await _get_publication_or_404(session, publication_id)
-    allowed_statuses = {status_item.value for status_item in PublicationStatus}
-    if payload.status not in allowed_statuses:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid publication status.")
-
-    before = _publication_state(publication)
-    publication.status = payload.status
-    publication.deleted_at = datetime.now(UTC) if payload.status == PublicationStatus.DELETED.value else None
-    await session.flush()
-    after = _publication_state(publication)
-    await record_admin_audit_event(
-        session,
-        admin_user_id=payload.admin_user_id,
-        target_type="publication",
-        target_id=publication.id,
-        action="patch_publication_status",
-        reason=payload.reason,
-        before_state=before,
-        after_state=after,
-    )
-    return _publication_response(publication)
+    try:
+        publication = await apply_publication_admin_action(
+            session,
+            publication_id=publication_id,
+            action=payload.action,
+            reason=payload.reason,
+        )
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _admin_publication_response(publication)
 
 
 @router.get("/payments/orders", response_model=AdminPaymentOrderListResponse)
-async def list_admin_payment_orders(
+async def admin_list_payment_orders(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    order_status: str | None = None,
-    user_id: uuid.UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    status_filter: str | None = Query(default=None, alias="status"),
+    provider: str | None = None,
+    user_id: uuid.UUID | None = None,
 ) -> AdminPaymentOrderListResponse:
-    """List payment orders for finance support."""
+    """List payment orders across users."""
 
-    query = select(PaymentOrder).order_by(PaymentOrder.created_at.desc()).limit(limit)
-    if order_status is not None:
-        query = query.where(PaymentOrder.status == order_status)
-    if user_id is not None:
-        query = query.where(PaymentOrder.user_id == user_id)
-    result = await session.execute(query)
-    return AdminPaymentOrderListResponse(items=[_payment_order_response(order) for order in result.scalars()])
+    try:
+        orders = await list_admin_payment_orders(
+            session,
+            limit=limit,
+            status=status_filter,
+            provider=provider,
+            user_id=user_id,
+        )
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return AdminPaymentOrderListResponse(items=[_admin_payment_order_response(order) for order in orders])
 
 
-@router.post("/wallet-adjustments", response_model=AdminWalletAdjustmentResponse)
-async def create_admin_wallet_adjustment(
+@router.post("/wallet/adjustments", response_model=AdminWalletAdjustmentResponse)
+async def admin_adjust_wallet(
     payload: AdminWalletAdjustmentRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AdminWalletAdjustmentResponse:
-    """Create a manual wallet adjustment through the immutable wallet ledger."""
+    """Credit a user wallet through the ledger and audit the adjustment."""
 
-    await _get_user_or_404(session, payload.user_id)
-    if payload.amount == 0:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Amount must not be zero.")
     try:
-        bucket = CreditBucket(payload.bucket)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid credit bucket.") from exc
-
-    operation_id = uuid.uuid4()
-    balances = await credit_wallet(
-        session,
-        user_id=payload.user_id,
-        amount=payload.amount,
-        bucket=bucket,
-        entry_type=WalletEntryType.ADMIN_ADJUSTMENT,
-        operation_id=operation_id,
-        admin_user_id=payload.admin_user_id,
-        reason=payload.reason,
-    )
-    await record_admin_audit_event(
-        session,
-        admin_user_id=payload.admin_user_id,
-        target_type="wallet",
-        target_id=payload.user_id,
-        action="wallet_adjustment",
-        reason=payload.reason,
-        before_state={},
-        after_state={"amount": payload.amount, "bucket": bucket.value, "operation_id": str(operation_id)},
-    )
+        operation_id, balances = await adjust_user_wallet(
+            session,
+            user_id=payload.user_id,
+            amount=payload.amount,
+            bucket=CreditBucket(payload.bucket),
+            reason=payload.reason,
+            admin_user_id=payload.admin_user_id,
+        )
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return AdminWalletAdjustmentResponse(
         user_id=payload.user_id,
+        operation_id=operation_id,
         amount=payload.amount,
-        bucket=bucket.value,
+        bucket=payload.bucket,
         total_available=balances.total_available,
         total_reserved=balances.total_reserved,
     )
 
 
-@router.get("/audit-events", response_model=AdminAuditEventListResponse)
-async def list_admin_audit_events(
+@router.get("/audit/events", response_model=AdminAuditEventListResponse)
+async def admin_list_audit_events(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    target_type: str | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    target_type: str | None = None,
+    action: str | None = None,
 ) -> AdminAuditEventListResponse:
     """List recent admin audit events."""
 
-    query = select(AdminAuditEvent).order_by(AdminAuditEvent.created_at.desc()).limit(limit)
-    if target_type is not None:
-        query = query.where(AdminAuditEvent.target_type == target_type)
-    result = await session.execute(query)
-    return AdminAuditEventListResponse(items=[_audit_event_response(event) for event in result.scalars()])
+    try:
+        events = await list_admin_audit_events(
+            session,
+            limit=limit,
+            target_type=target_type,
+            action=action,
+        )
+    except AdminServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return AdminAuditEventListResponse(items=[_admin_audit_event_response(event) for event in events])
 
 
-async def _get_user_or_404(session: AsyncSession, user_id: uuid.UUID) -> User:
-    result = await session.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-    return user
+async def _wallets_by_user_id(session: AsyncSession, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, Wallet]:
+    if not user_ids:
+        return {}
+    result = await session.execute(select(Wallet).where(Wallet.user_id.in_(user_ids)))
+    return {wallet.user_id: wallet for wallet in result.scalars()}
 
 
-async def _get_publication_or_404(session: AsyncSession, publication_id: uuid.UUID) -> Publication:
-    result = await session.execute(select(Publication).where(Publication.id == publication_id))
-    publication = result.scalar_one_or_none()
-    if publication is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication not found.")
-    return publication
-
-
-def _user_response(user: User) -> AdminUserResponse:
+def _admin_user_response(user: object, wallet: Wallet | None) -> AdminUserResponse:
     return AdminUserResponse(
         id=user.id,
         telegram_user_id=user.telegram_user_id,
@@ -280,82 +256,68 @@ def _user_response(user: User) -> AdminUserResponse:
         can_publish_profile=user.can_publish_profile,
         can_publish_feed=user.can_publish_feed,
         can_use_payments=user.can_use_payments,
+        cached_available_balance=wallet.cached_available_balance if wallet else None,
+        cached_reserved_balance=wallet.cached_reserved_balance if wallet else None,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
 
 
-def _user_flag_state(user: User) -> dict[str, object]:
-    return {
-        "is_blocked": user.is_blocked,
-        "can_generate": user.can_generate,
-        "can_publish_profile": user.can_publish_profile,
-        "can_publish_feed": user.can_publish_feed,
-        "can_use_payments": user.can_use_payments,
-    }
-
-
-def _generation_response(task: GenerationTask) -> AdminGenerationResponse:
+def _admin_generation_response(task: object) -> AdminGenerationResponse:
     return AdminGenerationResponse(
         id=task.id,
         user_id=task.user_id,
+        status=task.status,
         provider=task.provider,
         model_code=task.model_code,
         operation=task.operation,
-        status=task.status,
-        provider_task_id=task.provider_task_id,
         reserved_credits=task.reserved_credits,
         charged_credits=task.charged_credits,
+        provider_task_id=task.provider_task_id,
         error_code=task.error_code,
         error_message=task.error_message,
         created_at=task.created_at,
-        submitted_at=task.submitted_at,
-        completed_at=task.completed_at,
+        updated_at=task.updated_at,
     )
 
 
-def _publication_response(publication: Publication) -> AdminPublicationResponse:
+def _admin_publication_response(publication: object) -> AdminPublicationResponse:
     return AdminPublicationResponse(
         id=publication.id,
         user_id=publication.user_id,
         asset_id=publication.asset_id,
-        title=publication.title,
         visibility=publication.visibility,
+        status=publication.status,
+        title=publication.title,
+        description=publication.description,
         is_explicit=publication.is_explicit,
         blur_required=publication.blur_required,
-        status=publication.status,
         published_at=publication.published_at,
         deleted_at=publication.deleted_at,
+        media_url=f"/media/assets/{publication.asset_id}/content",
     )
 
 
-def _publication_state(publication: Publication) -> dict[str, object]:
-    return {
-        "status": publication.status,
-        "deleted_at": publication.deleted_at.isoformat() if publication.deleted_at else None,
-    }
-
-
-def _payment_order_response(order: PaymentOrder) -> AdminPaymentOrderResponse:
+def _admin_payment_order_response(order: object) -> AdminPaymentOrderResponse:
     return AdminPaymentOrderResponse(
         id=order.id,
         user_id=order.user_id,
         provider=order.provider,
+        external_payment_id=order.external_payment_id,
         package_code=order.package_code,
         amount_minor=order.amount_minor,
         currency=order.currency,
         credits_amount=order.credits_amount,
         status=order.status,
-        external_payment_id=order.external_payment_id,
-        provider_checkout_url=order.provider_checkout_url,
         expires_at=order.expires_at,
         paid_at=order.paid_at,
+        provider_checkout_url=order.provider_checkout_url,
         created_at=order.created_at,
         updated_at=order.updated_at,
     )
 
 
-def _audit_event_response(event: AdminAuditEvent) -> AdminAuditEventResponse:
+def _admin_audit_event_response(event: object) -> AdminAuditEventResponse:
     return AdminAuditEventResponse(
         id=event.id,
         admin_user_id=event.admin_user_id,
