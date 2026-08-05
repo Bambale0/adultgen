@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
 class AdminUserResponse(BaseModel):
-    """User summary for admin dashboards."""
+    """Admin-facing user row."""
 
     id: uuid.UUID
     telegram_user_id: int
@@ -21,6 +22,8 @@ class AdminUserResponse(BaseModel):
     can_publish_profile: bool
     can_publish_feed: bool
     can_use_payments: bool
+    cached_available_balance: int | None = None
+    cached_reserved_balance: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -31,8 +34,8 @@ class AdminUserListResponse(BaseModel):
     items: list[AdminUserResponse]
 
 
-class AdminUserFlagsPatchRequest(BaseModel):
-    """Admin user capability patch."""
+class AdminUserCapabilityUpdateRequest(BaseModel):
+    """Partial user capability update."""
 
     is_blocked: bool | None = None
     can_generate: bool | None = None
@@ -40,47 +43,47 @@ class AdminUserFlagsPatchRequest(BaseModel):
     can_publish_feed: bool | None = None
     can_use_payments: bool | None = None
     reason: str = Field(min_length=3, max_length=500)
-    admin_user_id: uuid.UUID | None = None
 
 
 class AdminGenerationResponse(BaseModel):
-    """Generation task summary for admin dashboards."""
+    """Admin-facing generation task row."""
 
     id: uuid.UUID
     user_id: uuid.UUID
+    status: str
     provider: str
     model_code: str
     operation: str
-    status: str
-    provider_task_id: str | None
     reserved_credits: int
     charged_credits: int
+    provider_task_id: str | None
     error_code: str | None
     error_message: str | None
     created_at: datetime
-    submitted_at: datetime | None
-    completed_at: datetime | None
+    updated_at: datetime
 
 
 class AdminGenerationListResponse(BaseModel):
-    """Admin generation task list."""
+    """Admin generation list."""
 
     items: list[AdminGenerationResponse]
 
 
 class AdminPublicationResponse(BaseModel):
-    """Publication summary for admin dashboards."""
+    """Admin-facing publication row."""
 
     id: uuid.UUID
     user_id: uuid.UUID
     asset_id: uuid.UUID
-    title: str | None
     visibility: str
+    status: str
+    title: str | None
+    description: str | None
     is_explicit: bool
     blur_required: bool
-    status: str
-    published_at: datetime
+    published_at: datetime | None
     deleted_at: datetime | None
+    media_url: str
 
 
 class AdminPublicationListResponse(BaseModel):
@@ -89,29 +92,28 @@ class AdminPublicationListResponse(BaseModel):
     items: list[AdminPublicationResponse]
 
 
-class AdminPublicationStatusRequest(BaseModel):
-    """Admin publication moderation status change."""
+class AdminPublicationActionRequest(BaseModel):
+    """Action to mutate a publication moderation state."""
 
-    status: str
+    action: Literal["hide", "restore", "delete"]
     reason: str = Field(min_length=3, max_length=500)
-    admin_user_id: uuid.UUID | None = None
 
 
 class AdminPaymentOrderResponse(BaseModel):
-    """Payment order summary for finance support."""
+    """Admin-facing payment order row."""
 
     id: uuid.UUID
     user_id: uuid.UUID
     provider: str
+    external_payment_id: str | None
     package_code: str
     amount_minor: int
     currency: str
     credits_amount: int
     status: str
-    external_payment_id: str | None
-    provider_checkout_url: str | None
     expires_at: datetime
     paid_at: datetime | None
+    provider_checkout_url: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -123,19 +125,20 @@ class AdminPaymentOrderListResponse(BaseModel):
 
 
 class AdminWalletAdjustmentRequest(BaseModel):
-    """Manual wallet adjustment request."""
+    """Append an admin wallet adjustment."""
 
     user_id: uuid.UUID
-    amount: int
-    bucket: str = "bonus"
+    amount: int = Field(ge=1, le=1_000_000)
+    bucket: Literal["purchased", "subscription", "bonus"] = "bonus"
     reason: str = Field(min_length=3, max_length=500)
     admin_user_id: uuid.UUID | None = None
 
 
 class AdminWalletAdjustmentResponse(BaseModel):
-    """Manual wallet adjustment result."""
+    """Wallet state after an admin adjustment."""
 
     user_id: uuid.UUID
+    operation_id: uuid.UUID
     amount: int
     bucket: str
     total_available: int
@@ -143,7 +146,7 @@ class AdminWalletAdjustmentResponse(BaseModel):
 
 
 class AdminAuditEventResponse(BaseModel):
-    """Admin audit event response."""
+    """Admin audit event row."""
 
     id: uuid.UUID
     admin_user_id: uuid.UUID | None
@@ -151,8 +154,8 @@ class AdminAuditEventResponse(BaseModel):
     target_id: uuid.UUID | None
     action: str
     reason: str | None
-    before_state: dict[str, object]
-    after_state: dict[str, object]
+    before_state: dict[str, Any]
+    after_state: dict[str, Any]
     created_at: datetime
 
 
