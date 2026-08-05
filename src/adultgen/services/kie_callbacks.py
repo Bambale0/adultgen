@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -177,13 +176,12 @@ async def _handle_completed_callback(
     parsed: ParsedKieCallback,
 ) -> KieCallbackResult:
     result_asset_ids: list[uuid.UUID] = []
-    for index, result_url in enumerate(parsed.result_urls):
+    for result_url in parsed.result_urls:
         asset = await register_external_media_asset(
             session,
             settings=settings,
             owner_user_id=task.user_id,
             external_url=result_url,
-            filename=f"kie-result-{index}",
         )
         result_asset_ids.append(asset.id)
 
