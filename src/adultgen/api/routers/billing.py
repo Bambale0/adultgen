@@ -1,5 +1,6 @@
 """Website billing API routes."""
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -59,7 +60,7 @@ async def create_billing_order(
 
 @router.post("/orders/{order_id}/crocopay", response_model=InitiateProviderCheckoutResponse)
 async def initiate_crocopay_checkout(
-    order_id: str,
+    order_id: uuid.UUID,
     claims: Annotated[AccessTokenClaims, Depends(get_current_token_claims)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_runtime_settings)],
@@ -67,7 +68,7 @@ async def initiate_crocopay_checkout(
     """Create a CrocoPay checkout link for an owned order."""
 
     try:
-        order = await get_payment_order_for_update(session, uuid_from_path(order_id))
+        order = await get_payment_order_for_update(session, order_id)
     except BillingServiceError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if order.user_id != claims.subject:
@@ -134,12 +135,3 @@ def _order_response(
         provider_checkout_url=order.provider_checkout_url,
         external_payment_id=order.external_payment_id,
     )
-
-
-def uuid_from_path(raw: str):
-    import uuid
-
-    try:
-        return uuid.UUID(raw)
-    except ValueError as exc:
-        raise BillingServiceError("Payment order id is invalid.") from exc
