@@ -11,9 +11,9 @@ def test_admin_panel_is_standalone_entrypoint() -> None:
     main = read("apps/web_app/src/main.tsx")
 
     assert "import { AdminPanel } from './AdminPanel';" in main
-    assert "window.location.pathname === '/admin'" in main
+    assert "window.location.pathname.startsWith('/admin')" in main
     assert "<AdminPanel />" in main
-    assert "<App />" in main
+    assert "<RoutedUserApp />" in main
     assert "./admin.css" in main
 
 

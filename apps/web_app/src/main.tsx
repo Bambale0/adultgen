@@ -2,11 +2,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import { AdminPanel } from './AdminPanel';
-import { App } from './App';
+import { RoutedUserApp } from './RoutedUserApp';
 import './styles.css';
 import './admin.css';
 
-const rootComponent = window.location.pathname === '/admin' ? <AdminPanel /> : <App />;
+const isAdminRoute = window.location.pathname.startsWith('/admin');
+const rootComponent = isAdminRoute ? <AdminPanel /> : <RoutedUserApp />;
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
