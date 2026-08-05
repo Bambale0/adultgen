@@ -6,6 +6,8 @@ import asyncio
 import shutil
 from pathlib import Path
 
+from adultgen.storage.ports import StoredObject
+
 
 class LocalObjectStorage:
     """Filesystem-backed object storage.
@@ -28,6 +30,18 @@ class LocalObjectStorage:
         """Persist object bytes under bucket/key."""
 
         await asyncio.to_thread(self._write_bytes, bucket, key, body)
+
+    async def get_object(
+        self,
+        *,
+        bucket: str,
+        key: str,
+        content_type: str,
+    ) -> StoredObject:
+        """Read object bytes from local bucket/key path."""
+
+        body = await asyncio.to_thread(self._read_bytes, bucket, key)
+        return StoredObject(body=body, content_type=content_type)
 
     async def copy_object(
         self,
@@ -57,6 +71,9 @@ class LocalObjectStorage:
         target = self._path(bucket, key)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(body)
+
+    def _read_bytes(self, bucket: str, key: str) -> bytes:
+        return self._path(bucket, key).read_bytes()
 
     def _copy_file(
         self,
