@@ -8,13 +8,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from adultgen.api.dependencies import get_current_token_claims, get_db_session, get_runtime_settings
-from adultgen.api.schemas.media import MediaAssetResponse, MediaUploadResponse
+from adultgen.api.schemas.media import MediaAssetResponse, MediaDerivativeResponse, MediaUploadResponse
 from adultgen.api.storage import get_object_storage
 from adultgen.config import Settings
-from adultgen.db.models.media import MediaAsset
+from adultgen.db.models.media import MediaAsset, MediaDerivative
 from adultgen.domain.media_storage import MediaBucketRole
 from adultgen.security.tokens import AccessTokenClaims, TokenError, verify_access_token
 from adultgen.services.media import MediaServiceError, UploadMediaCommand, upload_media_asset
+from adultgen.services.media_derivatives import (
+    MediaDerivativeError,
+    MediaDerivativeVariant,
+    ensure_media_derivative,
+)
 from adultgen.storage.ports import ObjectStorage
 
 router = APIRouter(prefix="/media", tags=["media"])
@@ -62,6 +67,35 @@ async def upload_reference_media(
     )
 
 
+@router.post("/assets/{asset_id}/derivatives/{variant}", response_model=MediaDerivativeResponse)
+async def create_media_derivative(
+    asset_id: uuid.UUID,
+    variant: MediaDerivativeVariant,
+    claims: Annotated[AccessTokenClaims, Depends(get_current_token_claims)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_runtime_settings)],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+) -> MediaDerivativeResponse:
+    """Create or return a preview/blur derivative for an owned published asset."""
+
+    asset = await _get_asset(session, asset_id)
+    if asset.owner_user_id != claims.subject:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Media asset is not owned by user.")
+
+    try:
+        derivative = await ensure_media_derivative(
+            session,
+            storage=storage,
+            settings=settings,
+            source_asset_id=asset_id,
+            variant=variant,
+        )
+    except MediaDerivativeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return _derivative_response(derivative)
+
+
 @router.get("/assets/{asset_id}/content")
 async def get_media_asset_content(
     asset_id: uuid.UUID,
@@ -77,9 +111,8 @@ async def get_media_asset_content(
     Production can replace this with signed CDN/S3 URLs without changing feed schema.
     """
 
-    result = await session.execute(select(MediaAsset).where(MediaAsset.id == asset_id))
-    asset = result.scalar_one_or_none()
-    if asset is None or asset.deleted_at is not None:
+    asset = await _get_asset(session, asset_id)
+    if asset.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media asset not found.")
 
     is_published = asset.storage_bucket == settings.s3_published_bucket
@@ -141,6 +174,14 @@ async def _upload_media(
     return MediaUploadResponse(asset=_asset_response(asset))
 
 
+async def _get_asset(session: AsyncSession, asset_id: uuid.UUID) -> MediaAsset:
+    result = await session.execute(select(MediaAsset).where(MediaAsset.id == asset_id))
+    asset = result.scalar_one_or_none()
+    if asset is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media asset not found.")
+    return asset
+
+
 def _optional_claims(authorization: str | None, *, settings: Settings) -> AccessTokenClaims | None:
     if not authorization or not authorization.startswith("Bearer "):
         return None
@@ -163,4 +204,16 @@ def _asset_response(asset: object) -> MediaAssetResponse:
         is_temporary=asset.is_temporary,
         expires_at=asset.expires_at,
         deleted_at=asset.deleted_at,
+    )
+
+
+def _derivative_response(derivative: MediaDerivative) -> MediaDerivativeResponse:
+    return MediaDerivativeResponse(
+        id=derivative.id,
+        source_asset_id=derivative.source_asset_id,
+        derivative_asset_id=derivative.derivative_asset_id,
+        variant=derivative.variant,
+        status=derivative.status,
+        processor_version=derivative.processor_version,
+        media_url=f"/media/assets/{derivative.derivative_asset_id}/content",
     )
