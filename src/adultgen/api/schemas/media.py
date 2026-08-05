@@ -27,3 +27,15 @@ class MediaUploadResponse(BaseModel):
     """Upload response wrapper."""
 
     asset: MediaAssetResponse
+
+
+class MediaDerivativeResponse(BaseModel):
+    """Derivative metadata returned after preview/blur creation."""
+
+    id: uuid.UUID
+    source_asset_id: uuid.UUID
+    derivative_asset_id: uuid.UUID
+    variant: str
+    status: str
+    processor_version: str
+    media_url: str
