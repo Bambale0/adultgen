@@ -4,10 +4,12 @@ import {
   acceptAdultConsent,
   coreMediaUrl,
   createGenerationTask,
+  createPaymentOrder,
   createPublication,
   createStarterWorkspace,
   createWebSession,
   fetchAdultConsent,
+  fetchCreditPackages,
   fetchFeed,
   fetchGenerationTask,
   fetchMyGenerations,
@@ -15,19 +17,23 @@ import {
   fetchMyPublications,
   fetchSavedCollection,
   importExternalMedia,
+  initiateCrocoPayCheckout,
   savePublication,
   updateMyProfile,
   uploadReferenceMedia,
   uploadTemporaryMedia,
   type AdultConsentStatus,
+  type CreditPackage,
   type FeedResponse,
   type GenerationMode,
   type GenerationResultAsset,
   type GenerationTask,
   type MediaAsset,
+  type PaymentOrder,
   type Profile,
   type Publication,
   type PublicationVisibility,
+  type ProviderCheckoutResponse,
   type WebSession,
 } from './api';
 import { findRouteByPath, primaryWebAppRoutes, webAppRoutes, type WebAppRoute } from './routes';
@@ -81,6 +87,10 @@ export function App() {
   const [myPublications, setMyPublications] = useState<Publication[]>([]);
   const [feed, setFeed] = useState<FeedResponse>({ items: [] });
   const [savedItems, setSavedItems] = useState<{ publication_id: string; saved_at: string }[]>([]);
+  const [creditPackages, setCreditPackages] = useState<CreditPackage[]>([]);
+  const [selectedPackageCode, setSelectedPackageCode] = useState('creator_1500');
+  const [latestPaymentOrder, setLatestPaymentOrder] = useState<PaymentOrder | null>(null);
+  const [latestCheckout, setLatestCheckout] = useState<ProviderCheckoutResponse | null>(null);
   const [email, setEmail] = useState('creator@example.com');
   const [displayName, setDisplayName] = useState('AdultGen creator');
   const [publishTitle, setPublishTitle] = useState('Web Studio result');
@@ -107,6 +117,28 @@ export function App() {
       ignore = true;
     };
   }, [session, adultConsent?.accepted]);
+
+  useEffect(() => {
+    if (activeRoute.id !== 'billing') return;
+
+    let ignore = false;
+    fetchCreditPackages()
+      .then((result) => {
+        if (!ignore) {
+          setCreditPackages(result.items);
+          if (!result.items.some((item) => item.code === selectedPackageCode)) {
+            setSelectedPackageCode(result.items[0]?.code ?? 'creator_1500');
+          }
+        }
+      })
+      .catch(() => {
+        if (!ignore) setCreditPackages([]);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [activeRoute.id, selectedPackageCode]);
 
   async function runAction<T>(message: string, action: () => Promise<T>): Promise<T | null> {
     setStatusMessage(message);
@@ -311,6 +343,42 @@ export function App() {
     if (result) setProfile(result);
   }
 
+  async function handleRefreshBillingPackages() {
+    const result = await runAction('Загружаем credit packages…', () => fetchCreditPackages());
+    if (!result) return;
+    setCreditPackages(result.items);
+    if (!result.items.some((item) => item.code === selectedPackageCode)) {
+      setSelectedPackageCode(result.items[0]?.code ?? 'creator_1500');
+    }
+  }
+
+  async function handleCreatePaymentOrder() {
+    if (!session) return;
+    const result = await runAction('Создаём payment order…', () =>
+      createPaymentOrder(session.access_token, selectedPackageCode, 'crocopay'),
+    );
+    if (!result) return;
+    setLatestPaymentOrder(result);
+    setLatestCheckout(null);
+  }
+
+  async function handleStartCrocoPayCheckout() {
+    if (!session) return;
+    let order = latestPaymentOrder;
+    if (!order || order.package_code !== selectedPackageCode || order.status === 'paid') {
+      order = await createPaymentOrder(session.access_token, selectedPackageCode, 'crocopay');
+      setLatestPaymentOrder(order);
+    }
+
+    const result = await runAction('Создаём CrocoPay checkout…', () =>
+      initiateCrocoPayCheckout(session.access_token, order.id),
+    );
+    if (!result) return;
+    setLatestPaymentOrder(result.order);
+    setLatestCheckout(result);
+    window.open(result.redirect_url, '_blank', 'noopener,noreferrer');
+  }
+
   function handleLogout() {
     clearWebSession();
     setSession(null);
@@ -323,6 +391,9 @@ export function App() {
     setMyPublications([]);
     setFeed({ items: [] });
     setSavedItems([]);
+    setCreditPackages([]);
+    setLatestPaymentOrder(null);
+    setLatestCheckout(null);
     setActiveRoute(webAppRoutes[0]);
   }
 
@@ -418,6 +489,17 @@ export function App() {
             onToggleVisibility={() => void handleToggleProfileVisibility()}
             onRefreshPublications={() => void handleRefreshMyPublications()}
           />
+        ) : activeRoute.id === 'billing' ? (
+          <BillingCard
+            packages={creditPackages}
+            selectedPackageCode={selectedPackageCode}
+            latestOrder={latestPaymentOrder}
+            latestCheckout={latestCheckout}
+            onSelectPackage={setSelectedPackageCode}
+            onRefreshPackages={() => void handleRefreshBillingPackages()}
+            onCreateOrder={() => void handleCreatePaymentOrder()}
+            onStartCheckout={() => void handleStartCrocoPayCheckout()}
+          />
         ) : (
           <ProductSection route={activeRoute} session={session} adultConsent={adultConsent} latestTask={latestTask} />
         )}
@@ -426,17 +508,7 @@ export function App() {
   );
 }
 
-function TopBar({
-  activeRoute,
-  statusMessage,
-  errorMessage,
-  onNavigate,
-}: {
-  activeRoute: WebAppRoute;
-  statusMessage: string | null;
-  errorMessage: string | null;
-  onNavigate: (route: WebAppRoute) => void;
-}) {
+function TopBar({ activeRoute, statusMessage, errorMessage, onNavigate }: { activeRoute: WebAppRoute; statusMessage: string | null; errorMessage: string | null; onNavigate: (route: WebAppRoute) => void }) {
   return (
     <header className="topbar">
       <div>
@@ -444,19 +516,11 @@ function TopBar({
         <h2>{activeRoute.title}</h2>
       </div>
       <div className="topbar-actions">
-        <select
-          aria-label="Route selector"
-          value={activeRoute.id}
-          onChange={(event) => {
-            const nextRoute = webAppRoutes.find((route) => route.id === event.target.value);
-            if (nextRoute) onNavigate(nextRoute);
-          }}
-        >
-          {webAppRoutes.map((route) => (
-            <option key={route.id} value={route.id}>
-              {route.title}
-            </option>
-          ))}
+        <select aria-label="Route selector" value={activeRoute.id} onChange={(event) => {
+          const nextRoute = webAppRoutes.find((route) => route.id === event.target.value);
+          if (nextRoute) onNavigate(nextRoute);
+        }}>
+          {webAppRoutes.map((route) => <option key={route.id} value={route.id}>{route.title}</option>)}
         </select>
         {statusMessage && <span className="status-pill">{statusMessage}</span>}
         {errorMessage && <span className="status-pill error">{errorMessage}</span>}
@@ -465,38 +529,15 @@ function TopBar({
   );
 }
 
-function LoginCard({
-  email,
-  displayName,
-  setEmail,
-  setDisplayName,
-  onLogin,
-}: {
-  email: string;
-  displayName: string;
-  setEmail: (value: string) => void;
-  setDisplayName: (value: string) => void;
-  onLogin: () => void;
-}) {
+function LoginCard({ email, displayName, setEmail, setDisplayName, onLogin }: { email: string; displayName: string; setEmail: (value: string) => void; setDisplayName: (value: string) => void; onLogin: () => void }) {
   return (
     <section className="card stack-card">
       <p className="eyebrow">Website auth</p>
       <h3>Вход в сайт-приложение</h3>
-      <p>
-        Для MVP используем web session endpoint. Позже этот слой можно заменить на email OTP,
-        OAuth, wallet login или полноценную регистрацию без изменения Core token-контракта.
-      </p>
-      <label>
-        Email
-        <input value={email} onChange={(event) => setEmail(event.target.value)} />
-      </label>
-      <label>
-        Имя профиля
-        <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
-      </label>
-      <button className="primary-button" type="button" onClick={onLogin}>
-        Войти и получить Core token
-      </button>
+      <p>Для MVP используем web session endpoint. Позже этот слой можно заменить на email OTP, OAuth, wallet login или полноценную регистрацию без изменения Core token-контракта.</p>
+      <label>Email<input value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+      <label>Имя профиля<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
+      <button className="primary-button" type="button" onClick={onLogin}>Войти и получить Core token</button>
     </section>
   );
 }
@@ -506,18 +547,10 @@ function AgeGateCard({ onAccept, onRefresh }: { onAccept: () => void; onRefresh:
     <section className="card stack-card danger-card">
       <p className="eyebrow">18+ safety gate</p>
       <h3>Подтверждение возраста и правил</h3>
-      <p>
-        Перед доступом к Studio и Feed пользователь подтверждает, что ему есть 18 лет,
-        соглашается с blur/moderation-контуром и понимает запреты на minors, public figures,
-        non-consensual identity, violence, coercion и hidden camera контент.
-      </p>
+      <p>Перед доступом к Studio и Feed пользователь подтверждает, что ему есть 18 лет, соглашается с blur/moderation-контуром и понимает запреты на minors, public figures, non-consensual identity, violence, coercion и hidden camera контент.</p>
       <div className="button-row">
-        <button className="primary-button" type="button" onClick={onAccept}>
-          Мне есть 18 лет, продолжить
-        </button>
-        <button className="ghost-button" type="button" onClick={onRefresh}>
-          Проверить статус
-        </button>
+        <button className="primary-button" type="button" onClick={onAccept}>Мне есть 18 лет, продолжить</button>
+        <button className="ghost-button" type="button" onClick={onRefresh}>Проверить статус</button>
       </div>
     </section>
   );
@@ -529,13 +562,8 @@ function LandingCard({ onStart }: { onStart: () => void }) {
       <div className="card hero-card">
         <p className="eyebrow">Web-first adult AI generation</p>
         <h3>Сайт как основной продукт, Telegram как companion</h3>
-        <p>
-          UX строится вокруг генератора: prompt, negative prompt, uploads, референсы, проекты,
-          лента, коллекция, профиль, биллинг и партнёрский кабинет.
-        </p>
-        <button className="primary-button" type="button" onClick={onStart}>
-          Открыть Studio
-        </button>
+        <p>UX строится вокруг генератора: prompt, negative prompt, uploads, референсы, проекты, лента, коллекция, профиль, биллинг и партнёрский кабинет.</p>
+        <button className="primary-button" type="button" onClick={onStart}>Открыть Studio</button>
       </div>
       <MetricCard label="Media" value="upload" text="Reference/temp uploads и publication flow." />
       <MetricCard label="Safety" value="18+" text="Adult gate и запретные категории до контента." />
@@ -544,51 +572,7 @@ function LandingCard({ onStart }: { onStart: () => void }) {
   );
 }
 
-function StudioCard({
-  studio,
-  setStudio,
-  workspace,
-  latestTask,
-  generationTasks,
-  uploadedAssets,
-  onPrepareWorkspace,
-  onLaunch,
-  onRefreshLatestTask,
-  onRefreshGenerationTasks,
-  onImportResultAsset,
-  onPublishResultAsset,
-  onUploadReference,
-  onUploadTemporary,
-  onPublishLatestAsset,
-  publishTitle,
-  publishDescription,
-  publishVisibility,
-  setPublishTitle,
-  setPublishDescription,
-  setPublishVisibility,
-}: {
-  studio: StudioState;
-  setStudio: (value: StudioState) => void;
-  workspace: WorkspaceDraft | null;
-  latestTask: GenerationTask | null;
-  generationTasks: GenerationTask[];
-  uploadedAssets: MediaAsset[];
-  onPrepareWorkspace: () => void;
-  onLaunch: () => void;
-  onRefreshLatestTask: () => void;
-  onRefreshGenerationTasks: () => void;
-  onImportResultAsset: (assetId: string, taskId?: string) => void;
-  onPublishResultAsset: (asset: GenerationResultAsset) => void;
-  onUploadReference: (event: ChangeEvent<HTMLInputElement>) => void;
-  onUploadTemporary: (event: ChangeEvent<HTMLInputElement>) => void;
-  onPublishLatestAsset: () => void;
-  publishTitle: string;
-  publishDescription: string;
-  publishVisibility: PublicationVisibility;
-  setPublishTitle: (value: string) => void;
-  setPublishDescription: (value: string) => void;
-  setPublishVisibility: (value: PublicationVisibility) => void;
-}) {
+function StudioCard({ studio, setStudio, workspace, latestTask, generationTasks, uploadedAssets, onPrepareWorkspace, onLaunch, onRefreshLatestTask, onRefreshGenerationTasks, onImportResultAsset, onPublishResultAsset, onUploadReference, onUploadTemporary, onPublishLatestAsset, publishTitle, publishDescription, publishVisibility, setPublishTitle, setPublishDescription, setPublishVisibility }: { studio: StudioState; setStudio: (value: StudioState) => void; workspace: WorkspaceDraft | null; latestTask: GenerationTask | null; generationTasks: GenerationTask[]; uploadedAssets: MediaAsset[]; onPrepareWorkspace: () => void; onLaunch: () => void; onRefreshLatestTask: () => void; onRefreshGenerationTasks: () => void; onImportResultAsset: (assetId: string, taskId?: string) => void; onPublishResultAsset: (asset: GenerationResultAsset) => void; onUploadReference: (event: ChangeEvent<HTMLInputElement>) => void; onUploadTemporary: (event: ChangeEvent<HTMLInputElement>) => void; onPublishLatestAsset: () => void; publishTitle: string; publishDescription: string; publishVisibility: PublicationVisibility; setPublishTitle: (value: string) => void; setPublishDescription: (value: string) => void; setPublishVisibility: (value: PublicationVisibility) => void }) {
   const estimatedCredits = estimateCredits(studio.mode, studio.duration_seconds);
 
   return (
@@ -596,107 +580,35 @@ function StudioCard({
       <form className="card stack-card" onSubmit={(event) => event.preventDefault()}>
         <p className="eyebrow">Generation Studio</p>
         <h3>Создание фото/видео</h3>
-        <label>
-          Режим
-          <select
-            value={studio.mode}
-            onChange={(event) => setStudio({ ...studio, mode: event.target.value as GenerationMode })}
-          >
-            <option value="image_text_to_image">Image · text-to-image</option>
-            <option value="image_to_image">Image · image-to-image</option>
-            <option value="video_text_to_video">Video · text-to-video</option>
-            <option value="video_image_to_video_first_frame">Video · first frame</option>
-            <option value="video_image_to_video_first_last_frames">Video · first + last frame</option>
-            <option value="video_multimodal_reference_to_video">Video · multimodal refs</option>
-          </select>
-        </label>
-        <label>
-          Prompt
-          <textarea rows={5} value={studio.prompt} onChange={(event) => setStudio({ ...studio, prompt: event.target.value })} />
-        </label>
-        <label>
-          Negative prompt
-          <textarea
-            rows={3}
-            value={studio.negative_prompt}
-            onChange={(event) => setStudio({ ...studio, negative_prompt: event.target.value })}
-          />
-        </label>
-        <label>
-          External reference URLs, по одному на строку
-          <textarea
-            rows={3}
-            value={studio.reference_urls}
-            onChange={(event) => setStudio({ ...studio, reference_urls: event.target.value })}
-          />
-        </label>
+        <label>Режим<select value={studio.mode} onChange={(event) => setStudio({ ...studio, mode: event.target.value as GenerationMode })}>
+          <option value="image_text_to_image">Image · text-to-image</option>
+          <option value="image_to_image">Image · image-to-image</option>
+          <option value="video_text_to_video">Video · text-to-video</option>
+          <option value="video_image_to_video_first_frame">Video · first frame</option>
+          <option value="video_image_to_video_first_last_frames">Video · first + last frame</option>
+          <option value="video_multimodal_reference_to_video">Video · multimodal refs</option>
+        </select></label>
+        <label>Prompt<textarea rows={5} value={studio.prompt} onChange={(event) => setStudio({ ...studio, prompt: event.target.value })} /></label>
+        <label>Negative prompt<textarea rows={3} value={studio.negative_prompt} onChange={(event) => setStudio({ ...studio, negative_prompt: event.target.value })} /></label>
+        <label>External reference URLs, по одному на строку<textarea rows={3} value={studio.reference_urls} onChange={(event) => setStudio({ ...studio, reference_urls: event.target.value })} /></label>
         <div className="form-grid">
-          <label>
-            Aspect ratio
-            <select value={studio.aspect_ratio} onChange={(event) => setStudio({ ...studio, aspect_ratio: event.target.value })}>
-              <option value="9:16">9:16</option>
-              <option value="16:9">16:9</option>
-              <option value="1:1">1:1</option>
-            </select>
-          </label>
-          <label>
-            Resolution
-            <select value={studio.resolution} onChange={(event) => setStudio({ ...studio, resolution: event.target.value })}>
-              <option value="720p">720p</option>
-              <option value="1080p">1080p</option>
-            </select>
-          </label>
-          <label>
-            Duration
-            <input
-              type="number"
-              min="1"
-              max="15"
-              value={studio.duration_seconds}
-              onChange={(event) => setStudio({ ...studio, duration_seconds: Number(event.target.value) })}
-            />
-          </label>
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={studio.generate_audio}
-              onChange={(event) => setStudio({ ...studio, generate_audio: event.target.checked })}
-            />
-            Generate audio
-          </label>
+          <label>Aspect ratio<select value={studio.aspect_ratio} onChange={(event) => setStudio({ ...studio, aspect_ratio: event.target.value })}><option value="9:16">9:16</option><option value="16:9">16:9</option><option value="1:1">1:1</option></select></label>
+          <label>Resolution<select value={studio.resolution} onChange={(event) => setStudio({ ...studio, resolution: event.target.value })}><option value="720p">720p</option><option value="1080p">1080p</option></select></label>
+          <label>Duration<input type="number" min="1" max="15" value={studio.duration_seconds} onChange={(event) => setStudio({ ...studio, duration_seconds: Number(event.target.value) })} /></label>
+          <label className="checkbox-label"><input type="checkbox" checked={studio.generate_audio} onChange={(event) => setStudio({ ...studio, generate_audio: event.target.checked })} />Generate audio</label>
         </div>
       </form>
 
       <aside className="card stack-card">
         <p className="eyebrow">Media + Publish</p>
         <h3>Uploads и публикация</h3>
-        <label>
-          Reference upload
-          <input type="file" accept="image/*,video/*,audio/*" onChange={onUploadReference} />
-        </label>
-        <label>
-          Temporary result upload
-          <input type="file" accept="image/*,video/*" onChange={onUploadTemporary} />
-        </label>
+        <label>Reference upload<input type="file" accept="image/*,video/*,audio/*" onChange={onUploadReference} /></label>
+        <label>Temporary result upload<input type="file" accept="image/*,video/*" onChange={onUploadTemporary} /></label>
         <AssetList assets={uploadedAssets} />
-        <label>
-          Publish title
-          <input value={publishTitle} onChange={(event) => setPublishTitle(event.target.value)} />
-        </label>
-        <label>
-          Publish description
-          <textarea rows={3} value={publishDescription} onChange={(event) => setPublishDescription(event.target.value)} />
-        </label>
-        <label>
-          Куда публиковать
-          <select value={publishVisibility} onChange={(event) => setPublishVisibility(event.target.value as PublicationVisibility)}>
-            <option value="profile">Только профиль</option>
-            <option value="feed">Общая лента</option>
-          </select>
-        </label>
-        <button className="ghost-button" type="button" onClick={onPublishLatestAsset}>
-          Опубликовать последний upload
-        </button>
+        <label>Publish title<input value={publishTitle} onChange={(event) => setPublishTitle(event.target.value)} /></label>
+        <label>Publish description<textarea rows={3} value={publishDescription} onChange={(event) => setPublishDescription(event.target.value)} /></label>
+        <label>Куда публиковать<select value={publishVisibility} onChange={(event) => setPublishVisibility(event.target.value as PublicationVisibility)}><option value="profile">Только профиль</option><option value="feed">Общая лента</option></select></label>
+        <button className="ghost-button" type="button" onClick={onPublishLatestAsset}>Опубликовать последний upload</button>
       </aside>
 
       <aside className="card stack-card">
@@ -704,337 +616,119 @@ function StudioCard({
         <h3>{estimatedCredits} credits</h3>
         <p>Сначала создаём workspace, затем generation task с резервом кредитов.</p>
         <div className="button-row">
-          <button className="ghost-button" type="button" onClick={onPrepareWorkspace}>
-            Подготовить workspace
-          </button>
-          <button className="primary-button" type="button" onClick={onLaunch}>
-            Запустить генерацию
-          </button>
-          <button className="ghost-button" type="button" onClick={onRefreshLatestTask} disabled={!latestTask}>
-            Обновить последнюю задачу
-          </button>
+          <button className="ghost-button" type="button" onClick={onPrepareWorkspace}>Подготовить workspace</button>
+          <button className="primary-button" type="button" onClick={onLaunch}>Запустить генерацию</button>
+          <button className="ghost-button" type="button" onClick={onRefreshLatestTask} disabled={!latestTask}>Обновить последнюю задачу</button>
         </div>
         {workspace && <CodeBlock value={JSON.stringify(workspace, null, 2)} />}
         {latestTask && <GenerationTaskCard task={latestTask} compact />}
       </aside>
 
-      <GenerationResultsPanel
-        tasks={generationTasks}
-        onRefresh={onRefreshGenerationTasks}
-        onImportResultAsset={onImportResultAsset}
-        onPublishResultAsset={onPublishResultAsset}
-      />
+      <GenerationResultsPanel tasks={generationTasks} onRefresh={onRefreshGenerationTasks} onImportResultAsset={onImportResultAsset} onPublishResultAsset={onPublishResultAsset} />
     </section>
   );
 }
 
-function GenerationResultsPanel({
-  tasks,
-  onRefresh,
-  onImportResultAsset,
-  onPublishResultAsset,
-}: {
-  tasks: GenerationTask[];
-  onRefresh: () => void;
-  onImportResultAsset: (assetId: string, taskId?: string) => void;
-  onPublishResultAsset: (asset: GenerationResultAsset) => void;
-}) {
+function BillingCard({ packages, selectedPackageCode, latestOrder, latestCheckout, onSelectPackage, onRefreshPackages, onCreateOrder, onStartCheckout }: { packages: CreditPackage[]; selectedPackageCode: string; latestOrder: PaymentOrder | null; latestCheckout: ProviderCheckoutResponse | null; onSelectPackage: (code: string) => void; onRefreshPackages: () => void; onCreateOrder: () => void; onStartCheckout: () => void }) {
+  const selectedPackage = packages.find((item) => item.code === selectedPackageCode);
+
   return (
-    <section className="card stack-card results-panel">
-      <div className="section-heading-row">
-        <div>
-          <p className="eyebrow">Generation history</p>
-          <h3>Результаты генераций</h3>
+    <section className="billing-grid">
+      <div className="card stack-card billing-hero">
+        <p className="eyebrow">Website billing</p>
+        <h3>Кредиты для генераций</h3>
+        <p>Billing flow: выбрать package → создать PaymentOrder → получить CrocoPay checkout → ждать webhook, который начислит purchased credits через wallet ledger.</p>
+        <div className="button-row">
+          <button className="ghost-button" type="button" onClick={onRefreshPackages}>Обновить пакеты</button>
+          <button className="primary-button" type="button" onClick={onCreateOrder} disabled={!selectedPackage}>Создать order</button>
+          <button className="primary-button" type="button" onClick={onStartCheckout} disabled={!selectedPackage}>Оплатить через CrocoPay</button>
         </div>
-        <button className="ghost-button" type="button" onClick={onRefresh}>
-          Обновить список
-        </button>
       </div>
-      <p>
-        После Kie callback здесь появятся result assets. External assets сначала импортируются в storage,
-        потом их можно публиковать в профиль или общую ленту.
-      </p>
-      {tasks.length === 0 ? (
-        <p className="muted-text">Пока нет generation tasks. Запусти генерацию или обнови список.</p>
-      ) : (
-        <div className="generation-grid">
-          {tasks.map((task) => (
-            <GenerationTaskCard
-              key={task.id}
-              task={task}
-              onImportResultAsset={(assetId) => onImportResultAsset(assetId, task.id)}
-              onPublishResultAsset={onPublishResultAsset}
-            />
-          ))}
-        </div>
-      )}
+      <div className="package-grid">
+        {packages.length === 0 ? (
+          <section className="card stack-card"><p className="muted-text">Пакеты ещё не загружены. Нажми “Обновить пакеты”.</p></section>
+        ) : (
+          packages.map((item) => (
+            <button key={item.code} type="button" className={item.code === selectedPackageCode ? 'package-card selected' : 'package-card'} onClick={() => onSelectPackage(item.code)}>
+              {item.is_popular && <span className="guard-pill enabled">popular</span>}
+              <strong>{item.title}</strong><span>{item.credits.toLocaleString('ru-RU')} credits</span><small>{item.amount_major} {item.currency}</small><p>{item.description}</p>
+            </button>
+          ))
+        )}
+      </div>
+      <aside className="card stack-card"><p className="eyebrow">Selected package</p>{selectedPackage ? <CodeBlock value={JSON.stringify(selectedPackage, null, 2)} /> : <p className="muted-text">Нет выбранного пакета.</p>}</aside>
+      <aside className="card stack-card"><p className="eyebrow">Latest payment order</p>{latestOrder ? <PaymentOrderSummary order={latestOrder} checkout={latestCheckout} /> : <p className="muted-text">Order ещё не создан.</p>}</aside>
     </section>
   );
 }
 
-function GenerationTaskCard({
-  task,
-  compact = false,
-  onImportResultAsset,
-  onPublishResultAsset,
-}: {
-  task: GenerationTask;
-  compact?: boolean;
-  onImportResultAsset?: (assetId: string) => void;
-  onPublishResultAsset?: (asset: GenerationResultAsset) => void;
-}) {
+function PaymentOrderSummary({ order, checkout }: { order: PaymentOrder; checkout: ProviderCheckoutResponse | null }) {
   return (
-    <article className="generation-card">
-      <div className="generation-card-head">
-        <div>
-          <strong>{task.operation}</strong>
-          <small>{task.id}</small>
-        </div>
-        <span className={`task-status ${task.status}`}>{task.status}</span>
-      </div>
-      <div className="guard-grid">
-        <GuardPill label={`${task.reserved_credits} reserved`} enabled />
-        <GuardPill label={`${task.charged_credits} charged`} enabled={task.charged_credits > 0} />
-        <GuardPill label={task.provider_task_id ? 'provider id' : 'no provider id'} enabled={Boolean(task.provider_task_id)} />
-      </div>
-      {task.error_message && <p className="muted-text">{task.error_code}: {task.error_message}</p>}
-      {!compact && (
-        <ResultAssetList
-          assets={task.results}
-          onImport={onImportResultAsset}
-          onPublish={onPublishResultAsset}
-        />
-      )}
-    </article>
-  );
-}
-
-function ResultAssetList({
-  assets,
-  onImport,
-  onPublish,
-}: {
-  assets: GenerationResultAsset[];
-  onImport?: (assetId: string) => void;
-  onPublish?: (asset: GenerationResultAsset) => void;
-}) {
-  if (assets.length === 0) return <p className="muted-text">Результатов пока нет: ждём callback от провайдера.</p>;
-  return (
-    <div className="result-list">
-      {assets.map((asset) => (
-        <div className="result-card" key={`${asset.role}-${asset.asset_id}`}>
-          <div className="result-preview">
-            {asset.role === 'video' ? (
-              <video controls preload="metadata" src={coreMediaUrl(asset.media_url)} />
-            ) : (
-              <img alt={`${asset.role} result`} src={coreMediaUrl(asset.media_url)} />
-            )}
-          </div>
-          <div className="result-meta">
-            <strong>{asset.role}</strong>
-            <small>{asset.asset_id}</small>
-            <GuardPill label={asset.is_external ? 'external' : 'stored'} enabled={!asset.is_external} />
-            <div className="button-row">
-              {asset.is_external && onImport && (
-                <button className="ghost-button small-button" type="button" onClick={() => onImport(asset.asset_id)}>
-                  Импортировать
-                </button>
-              )}
-              {onPublish && (
-                <button
-                  className="primary-button small-button"
-                  type="button"
-                  disabled={asset.is_external}
-                  onClick={() => onPublish(asset)}
-                >
-                  Опубликовать
-                </button>
-              )}
-              <a className="text-link" href={coreMediaUrl(asset.media_url)} target="_blank" rel="noreferrer">
-                Открыть media
-              </a>
-            </div>
-          </div>
-        </div>
-      ))}
+    <div className="payment-order-card">
+      <div className="section-heading-row"><div><strong>{order.package_code}</strong><small>{order.id}</small></div><span className={`task-status ${order.status}`}>{order.status}</span></div>
+      <div className="guard-grid"><GuardPill label={`${order.credits_amount} credits`} enabled /><GuardPill label={`${order.amount_minor} ${order.currency}`} enabled /><GuardPill label={order.external_payment_id ? 'provider id' : 'no provider id'} enabled={Boolean(order.external_payment_id)} /></div>
+      <small>Expires: {new Date(order.expires_at).toLocaleString('ru-RU')}</small>
+      {order.checkout_url && <a className="text-link" href={order.checkout_url} target="_blank" rel="noreferrer">Open internal checkout</a>}
+      {order.callback_url && <small>Callback token URL prepared for provider webhook.</small>}
+      {order.provider_checkout_url && <a className="text-link" href={order.provider_checkout_url} target="_blank" rel="noreferrer">Open provider checkout</a>}
+      {checkout && <a className="primary-button checkout-link" href={checkout.redirect_url} target="_blank" rel="noreferrer">Перейти к оплате</a>}
     </div>
   );
+}
+
+function GenerationResultsPanel({ tasks, onRefresh, onImportResultAsset, onPublishResultAsset }: { tasks: GenerationTask[]; onRefresh: () => void; onImportResultAsset: (assetId: string, taskId?: string) => void; onPublishResultAsset: (asset: GenerationResultAsset) => void }) {
+  return (
+    <section className="card stack-card results-panel">
+      <div className="section-heading-row"><div><p className="eyebrow">Generation history</p><h3>Результаты генераций</h3></div><button className="ghost-button" type="button" onClick={onRefresh}>Обновить список</button></div>
+      <p>После Kie callback здесь появятся result assets. External assets сначала импортируются в storage, потом их можно публиковать в профиль или общую ленту.</p>
+      {tasks.length === 0 ? <p className="muted-text">Пока нет generation tasks. Запусти генерацию или обнови список.</p> : <div className="generation-grid">{tasks.map((task) => <GenerationTaskCard key={task.id} task={task} onImportResultAsset={(assetId) => onImportResultAsset(assetId, task.id)} onPublishResultAsset={onPublishResultAsset} />)}</div>}
+    </section>
+  );
+}
+
+function GenerationTaskCard({ task, compact = false, onImportResultAsset, onPublishResultAsset }: { task: GenerationTask; compact?: boolean; onImportResultAsset?: (assetId: string) => void; onPublishResultAsset?: (asset: GenerationResultAsset) => void }) {
+  return (
+    <article className="generation-card"><div className="generation-card-head"><div><strong>{task.operation}</strong><small>{task.id}</small></div><span className={`task-status ${task.status}`}>{task.status}</span></div><div className="guard-grid"><GuardPill label={`${task.reserved_credits} reserved`} enabled /><GuardPill label={`${task.charged_credits} charged`} enabled={task.charged_credits > 0} /><GuardPill label={task.provider_task_id ? 'provider id' : 'no provider id'} enabled={Boolean(task.provider_task_id)} /></div>{task.error_message && <p className="muted-text">{task.error_code}: {task.error_message}</p>}{!compact && <ResultAssetList assets={task.results} onImport={onImportResultAsset} onPublish={onPublishResultAsset} />}</article>
+  );
+}
+
+function ResultAssetList({ assets, onImport, onPublish }: { assets: GenerationResultAsset[]; onImport?: (assetId: string) => void; onPublish?: (asset: GenerationResultAsset) => void }) {
+  if (assets.length === 0) return <p className="muted-text">Результатов пока нет: ждём callback от провайдера.</p>;
+  return <div className="result-list">{assets.map((asset) => <div className="result-card" key={`${asset.role}-${asset.asset_id}`}><div className="result-preview">{asset.role === 'video' ? <video controls preload="metadata" src={coreMediaUrl(asset.media_url)} /> : <img alt={`${asset.role} result`} src={coreMediaUrl(asset.media_url)} />}</div><div className="result-meta"><strong>{asset.role}</strong><small>{asset.asset_id}</small><GuardPill label={asset.is_external ? 'external' : 'stored'} enabled={!asset.is_external} /><div className="button-row">{asset.is_external && onImport && <button className="ghost-button small-button" type="button" onClick={() => onImport(asset.asset_id)}>Импортировать</button>}{onPublish && <button className="primary-button small-button" type="button" disabled={asset.is_external} onClick={() => onPublish(asset)}>Опубликовать</button>}<a className="text-link" href={coreMediaUrl(asset.media_url)} target="_blank" rel="noreferrer">Открыть media</a></div></div></div>)}</div>;
 }
 
 function AssetList({ assets }: { assets: MediaAsset[] }) {
   if (assets.length === 0) return <p className="muted-text">Пока нет загруженных assets.</p>;
-  return (
-    <div className="item-list">
-      {assets.slice(0, 5).map((asset) => (
-        <div className="item-row" key={asset.id}>
-          <strong>{asset.media_type}</strong>
-          <span>{asset.mime_type}</span>
-          <small>{asset.id}</small>
-        </div>
-      ))}
-    </div>
-  );
+  return <div className="item-list">{assets.slice(0, 5).map((asset) => <div className="item-row" key={asset.id}><strong>{asset.media_type}</strong><span>{asset.mime_type}</span><small>{asset.id}</small></div>)}</div>;
 }
 
-function FeedCard({
-  feed,
-  onRefresh,
-  onSave,
-}: {
-  feed: FeedResponse;
-  onRefresh: () => void;
-  onSave: (publicationId: string) => void;
-}) {
-  return (
-    <section className="card stack-card">
-      <p className="eyebrow">Common Feed</p>
-      <h3>Лента публикаций</h3>
-      <button className="primary-button" type="button" onClick={onRefresh}>
-        Обновить ленту
-      </button>
-      <PublicationList publications={feed.items} onSave={onSave} />
-    </section>
-  );
+function FeedCard({ feed, onRefresh, onSave }: { feed: FeedResponse; onRefresh: () => void; onSave: (publicationId: string) => void }) {
+  return <section className="card stack-card"><p className="eyebrow">Common Feed</p><h3>Лента публикаций</h3><button className="primary-button" type="button" onClick={onRefresh}>Обновить ленту</button><PublicationList publications={feed.items} onSave={onSave} /></section>;
 }
 
 function CollectionCard({ savedItems, onRefresh }: { savedItems: { publication_id: string; saved_at: string }[]; onRefresh: () => void }) {
-  return (
-    <section className="card stack-card">
-      <p className="eyebrow">Saved Collection</p>
-      <h3>Коллекция</h3>
-      <button className="primary-button" type="button" onClick={onRefresh}>
-        Обновить коллекцию
-      </button>
-      <div className="item-list">
-        {savedItems.length === 0 ? (
-          <p className="muted-text">Пока ничего не сохранено.</p>
-        ) : (
-          savedItems.map((item) => (
-            <div className="item-row" key={item.publication_id}>
-              <strong>{item.publication_id}</strong>
-              <span>{new Date(item.saved_at).toLocaleString()}</span>
-            </div>
-          ))
-        )}
-      </div>
-    </section>
-  );
+  return <section className="card stack-card"><p className="eyebrow">Saved Collection</p><h3>Коллекция</h3><button className="primary-button" type="button" onClick={onRefresh}>Обновить коллекцию</button><div className="item-list">{savedItems.length === 0 ? <p className="muted-text">Пока ничего не сохранено.</p> : savedItems.map((item) => <div className="item-row" key={item.publication_id}><strong>{item.publication_id}</strong><span>{new Date(item.saved_at).toLocaleString()}</span></div>)}</div></section>;
 }
 
-function ProfileCard({
-  profile,
-  publications,
-  onLoad,
-  onToggleVisibility,
-  onRefreshPublications,
-}: {
-  profile: Profile | null;
-  publications: Publication[];
-  onLoad: () => void;
-  onToggleVisibility: () => void;
-  onRefreshPublications: () => void;
-}) {
-  return (
-    <section className="card stack-card">
-      <p className="eyebrow">Creator Profile</p>
-      <h3>Профиль автора</h3>
-      <div className="button-row">
-        <button className="ghost-button" type="button" onClick={onLoad}>
-          Загрузить профиль
-        </button>
-        <button className="primary-button" type="button" onClick={onToggleVisibility}>
-          Переключить public/private
-        </button>
-        <button className="ghost-button" type="button" onClick={onRefreshPublications}>
-          Мои публикации
-        </button>
-      </div>
-      {profile && <CodeBlock value={JSON.stringify(profile, null, 2)} />}
-      <PublicationList publications={publications} />
-    </section>
-  );
+function ProfileCard({ profile, publications, onLoad, onToggleVisibility, onRefreshPublications }: { profile: Profile | null; publications: Publication[]; onLoad: () => void; onToggleVisibility: () => void; onRefreshPublications: () => void }) {
+  return <section className="card stack-card"><p className="eyebrow">Creator Profile</p><h3>Профиль автора</h3><div className="button-row"><button className="ghost-button" type="button" onClick={onLoad}>Загрузить профиль</button><button className="primary-button" type="button" onClick={onToggleVisibility}>Переключить public/private</button><button className="ghost-button" type="button" onClick={onRefreshPublications}>Мои публикации</button></div>{profile && <CodeBlock value={JSON.stringify(profile, null, 2)} />}<PublicationList publications={publications} /></section>;
 }
 
 function PublicationList({ publications, onSave }: { publications: Publication[]; onSave?: (publicationId: string) => void }) {
   if (publications.length === 0) return <p className="muted-text">Публикаций пока нет.</p>;
-  return (
-    <div className="item-list">
-      {publications.map((publication) => (
-        <div className="item-row" key={publication.id}>
-          <strong>{publication.title || 'Untitled publication'}</strong>
-          <span>{publication.visibility} · {publication.status} · asset {publication.asset_id}</span>
-          <small>{publication.blur_required ? 'blur required' : 'no blur'} · remix {publication.allow_remix ? 'on' : 'off'}</small>
-          {publication.preview_url && (
-            <img className="publication-preview" alt={publication.title || 'Publication preview'} src={coreMediaUrl(publication.preview_url)} />
-          )}
-          {onSave && (
-            <button className="ghost-button small-button" type="button" onClick={() => onSave(publication.id)}>
-              В коллекцию
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  return <div className="item-list">{publications.map((publication) => <div className="item-row" key={publication.id}><strong>{publication.title || 'Untitled publication'}</strong><span>{publication.visibility} · {publication.status} · asset {publication.asset_id}</span><small>{publication.blur_required ? 'blur required' : 'no blur'} · remix {publication.allow_remix ? 'on' : 'off'}</small>{publication.preview_url && <img className="publication-preview" alt={publication.title || 'Publication preview'} src={coreMediaUrl(publication.preview_url)} />}{onSave && <button className="ghost-button small-button" type="button" onClick={() => onSave(publication.id)}>В коллекцию</button>}</div>)}</div>;
 }
 
-function ProductSection({
-  route,
-  session,
-  adultConsent,
-  latestTask,
-}: {
-  route: WebAppRoute;
-  session: WebSession | null;
-  adultConsent: AdultConsentStatus | null;
-  latestTask: GenerationTask | null;
-}) {
-  return (
-    <section className="card stack-card">
-      <p className="eyebrow">{route.path}</p>
-      <h3>{route.title}</h3>
-      <p>{route.description}</p>
-      <div className="guard-grid">
-        <GuardPill label="Auth" enabled={Boolean(session)} />
-        <GuardPill label="18+ consent" enabled={Boolean(adultConsent?.accepted)} />
-        <GuardPill label="Latest task" enabled={Boolean(latestTask)} />
-      </div>
-    </section>
-  );
+function ProductSection({ route, session, adultConsent, latestTask }: { route: WebAppRoute; session: WebSession | null; adultConsent: AdultConsentStatus | null; latestTask: GenerationTask | null }) {
+  return <section className="card stack-card"><p className="eyebrow">{route.path}</p><h3>{route.title}</h3><p>{route.description}</p><div className="guard-grid"><GuardPill label="Auth" enabled={Boolean(session)} /><GuardPill label="18+ consent" enabled={Boolean(adultConsent?.accepted)} /><GuardPill label="Latest task" enabled={Boolean(latestTask)} /></div></section>;
 }
 
-function SessionPanel({
-  session,
-  adultConsent,
-  onLogout,
-}: {
-  session: WebSession | null;
-  adultConsent: AdultConsentStatus | null;
-  onLogout: () => void;
-}) {
-  return (
-    <section className="session-panel">
-      <p className="eyebrow">Session</p>
-      <GuardPill label="Web token" enabled={Boolean(session)} />
-      <GuardPill label="18+ accepted" enabled={Boolean(adultConsent?.accepted)} />
-      {session && <small>{session.email}</small>}
-      {session && (
-        <button className="ghost-button" type="button" onClick={onLogout}>
-          Выйти
-        </button>
-      )}
-    </section>
-  );
+function SessionPanel({ session, adultConsent, onLogout }: { session: WebSession | null; adultConsent: AdultConsentStatus | null; onLogout: () => void }) {
+  return <section className="session-panel"><p className="eyebrow">Session</p><GuardPill label="Web token" enabled={Boolean(session)} /><GuardPill label="18+ accepted" enabled={Boolean(adultConsent?.accepted)} />{session && <small>{session.email}</small>}{session && <button className="ghost-button" type="button" onClick={onLogout}>Выйти</button>}</section>;
 }
 
 function MetricCard({ label, value, text }: { label: string; value: string; text: string }) {
-  return (
-    <div className="card metric-card">
-      <p className="eyebrow">{label}</p>
-      <strong>{value}</strong>
-      <span>{text}</span>
-    </div>
-  );
+  return <div className="card metric-card"><p className="eyebrow">{label}</p><strong>{value}</strong><span>{text}</span></div>;
 }
 
 function GuardPill({ label, enabled }: { label: string; enabled: boolean }) {

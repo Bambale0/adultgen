@@ -126,6 +126,44 @@ export type Profile = {
   visibility: 'public' | 'private';
 };
 
+export type CreditPackage = {
+  code: string;
+  title: string;
+  credits: number;
+  amount_minor: number;
+  amount_major: string;
+  currency: string;
+  description: string;
+  is_popular: boolean;
+};
+
+export type CreditPackageListResponse = {
+  items: CreditPackage[];
+};
+
+export type PaymentProvider = 'crocopay' | 'sharpay';
+
+export type PaymentOrder = {
+  id: string;
+  provider: string;
+  package_code: string;
+  amount_minor: number;
+  currency: string;
+  credits_amount: number;
+  status: string;
+  expires_at: string;
+  paid_at: string | null;
+  checkout_url: string | null;
+  callback_url: string | null;
+  provider_checkout_url: string | null;
+  external_payment_id: string | null;
+};
+
+export type ProviderCheckoutResponse = {
+  order: PaymentOrder;
+  redirect_url: string;
+};
+
 const CORE_API_URL = import.meta.env.VITE_CORE_API_URL || '/api';
 
 export function coreMediaUrl(path: string): string {
@@ -268,6 +306,32 @@ export async function updateMyProfile(
     method: 'PATCH',
     accessToken,
     body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchCreditPackages(): Promise<CreditPackageListResponse> {
+  return request<CreditPackageListResponse>('/billing/packages');
+}
+
+export async function createPaymentOrder(
+  accessToken: string,
+  packageCode: string,
+  provider: PaymentProvider = 'crocopay',
+): Promise<PaymentOrder> {
+  return request<PaymentOrder>('/billing/orders', {
+    method: 'POST',
+    accessToken,
+    body: JSON.stringify({ package_code: packageCode, provider }),
+  });
+}
+
+export async function initiateCrocoPayCheckout(
+  accessToken: string,
+  orderId: string,
+): Promise<ProviderCheckoutResponse> {
+  return request<ProviderCheckoutResponse>(`/billing/orders/${orderId}/crocopay`, {
+    method: 'POST',
+    accessToken,
   });
 }
 
