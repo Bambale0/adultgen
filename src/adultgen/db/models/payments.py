@@ -54,7 +54,7 @@ class PaymentWebhookRaw(Base):
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     request_method: Mapped[str] = mapped_column(Text, nullable=False)
-    request_path: Mapped[str,] = mapped_column(Text, nullable=False)
+    request_path: Mapped[str] = mapped_column(Text, nullable=False)
     query_string: Mapped[str | None] = mapped_column(Text)
     headers: Mapped[dict[str, object]] = jsonb_default()
     raw_body: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
