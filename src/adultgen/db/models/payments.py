@@ -31,6 +31,8 @@ class PaymentOrder(Base, TimestampMixin):
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     external_payment_id: Mapped[str | None] = mapped_column(Text)
     checkout_token_hash: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    callback_token_hash: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    provider_checkout_url: Mapped[str | None] = mapped_column(Text)
     package_code: Mapped[str] = mapped_column(Text, nullable=False)
     amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(Text, nullable=False)

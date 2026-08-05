@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     sharpay_api_key: str = Field(alias="SHARPAY_API_KEY")
     crocopay_api_key: str = Field(alias="CROCOPAY_API_KEY")
     crocopay_secret: str = Field(alias="CROCOPAY_SECRET")
+    crocopay_api_base_url: str = Field(default="https://crocopay.tech", alias="CROCOPAY_API_BASE_URL")
+    crocopay_client_id: str = Field(default="", alias="CROCOPAY_CLIENT_ID")
+    crocopay_client_secret: str = Field(default="", alias="CROCOPAY_CLIENT_SECRET")
 
     jwt_secret: str = Field(alias="JWT_SECRET")
     jwt_access_token_ttl_seconds: int = Field(default=86_400, alias="JWT_ACCESS_TOKEN_TTL_SECONDS")

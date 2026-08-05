@@ -7,6 +7,7 @@ from adultgen.api.routers import (
     admin,
     adult_consent,
     auth,
+    billing,
     collections,
     generations,
     media,
@@ -36,6 +37,7 @@ def create_app() -> FastAPI:
     app.include_router(collections.router)
     app.include_router(media.router)
     app.include_router(publications.router)
+    app.include_router(billing.router)
     app.include_router(webhooks.router)
     app.include_router(admin.router)
 
