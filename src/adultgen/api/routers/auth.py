@@ -20,6 +20,7 @@ from adultgen.integrations.telegram.mini_app_auth import (
 )
 from adultgen.security.tokens import create_access_token
 from adultgen.services.users import (
+    AuthenticatedUser,
     BotTokenResolver,
     UserServiceError,
     get_active_telegram_channel,
@@ -126,10 +127,10 @@ async def authenticate_web_session(
     )
 
 
-def _capabilities_response(user: object) -> UserCapabilityResponse:
+def _capabilities_response(user: AuthenticatedUser) -> UserCapabilityResponse:
     return UserCapabilityResponse(
-        can_generate=getattr(user, "can_generate"),
-        can_publish_profile=getattr(user, "can_publish_profile"),
-        can_publish_feed=getattr(user, "can_publish_feed"),
-        can_use_payments=getattr(user, "can_use_payments"),
+        can_generate=user.can_generate,
+        can_publish_profile=user.can_publish_profile,
+        can_publish_feed=user.can_publish_feed,
+        can_use_payments=user.can_use_payments,
     )
