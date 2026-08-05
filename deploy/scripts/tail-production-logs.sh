@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-COMPOSE_FILE=${COMPOSE_FILE:-compose.production.yml}
+COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.production.yml}
 ENV_FILE=${ENV_FILE:-.env.production}
 SERVICE=${1:-}
 
