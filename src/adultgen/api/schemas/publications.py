@@ -42,6 +42,9 @@ class PublicationResponse(BaseModel):
     prompt_public: bool
     status: str
     published_at: datetime
+    media_url: str
+    preview_url: str
+    blur_preview_url: str | None = None
 
 
 class FeedResponse(BaseModel):
