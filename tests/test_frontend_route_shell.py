@@ -35,3 +35,17 @@ def test_routes_keep_metadata_needed_by_route_hook() -> None:
     assert "path: string" in routes
     assert "findRouteByPath" in routes
     assert "webAppRoutes.find((route) => route.path === pathname)" in routes
+
+
+def test_routed_user_app_wires_route_hook_to_user_shell() -> None:
+    routed_user_app = read("apps/web_app/src/RoutedUserApp.tsx")
+    main = read("apps/web_app/src/main.tsx")
+
+    assert "useWebRoute" in routed_user_app
+    assert "window.addEventListener('click'" in routed_user_app
+    assert "window.addEventListener('change'" in routed_user_app
+    assert "routeFromButton" in routed_user_app
+    assert "routeFromSelect" in routed_user_app
+    assert "<App key={activeRoute.path}" in routed_user_app
+    assert "RoutedUserApp" in main
+    assert "window.location.pathname.startsWith('/admin')" in main
