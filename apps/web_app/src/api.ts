@@ -28,6 +28,46 @@ export type CreateWorkspaceResponse = {
   scene_id: string;
 };
 
+export type MediaAsset = {
+  id: string;
+  storage_bucket: string;
+  storage_key: string;
+  media_type: string;
+  mime_type: string;
+  size_bytes: number | null;
+  checksum_sha256: string | null;
+  is_temporary: boolean;
+  expires_at: string | null;
+  deleted_at: string | null;
+};
+
+export type MediaUploadResponse = {
+  asset: MediaAsset;
+};
+
+export type PublicationVisibility = 'profile' | 'feed';
+
+export type Publication = {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  scene_take_id: string | null;
+  asset_id: string;
+  title: string | null;
+  description: string | null;
+  visibility: PublicationVisibility;
+  is_explicit: boolean;
+  blur_required: boolean;
+  allow_remix: boolean;
+  prompt_public: boolean;
+  status: string;
+  published_at: string;
+};
+
+export type FeedResponse = {
+  items: Publication[];
+};
+
 export type GenerationMode =
   | 'image_text_to_image'
   | 'image_to_image'
@@ -115,6 +155,55 @@ export async function createStarterWorkspace(accessToken: string): Promise<Creat
   };
 }
 
+export async function uploadTemporaryMedia(accessToken: string, file: File): Promise<MediaUploadResponse> {
+  return uploadMedia('/media/uploads/temporary', accessToken, file);
+}
+
+export async function uploadReferenceMedia(accessToken: string, file: File): Promise<MediaUploadResponse> {
+  return uploadMedia('/media/uploads/references', accessToken, file);
+}
+
+export async function createPublication(
+  accessToken: string,
+  payload: {
+    asset_id: string;
+    title: string;
+    description: string;
+    visibility: PublicationVisibility;
+    is_explicit: boolean;
+    blur_required: boolean;
+    allow_remix: boolean;
+    prompt_public: boolean;
+    project_id?: string | null;
+  },
+): Promise<Publication> {
+  return request<Publication>('/publications', {
+    method: 'POST',
+    accessToken,
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchFeed(limit = 30): Promise<FeedResponse> {
+  return request<FeedResponse>(`/feed?limit=${limit}`);
+}
+
+export async function fetchMyPublications(accessToken: string): Promise<FeedResponse> {
+  return request<FeedResponse>('/profiles/me/publications', { accessToken });
+}
+
+export async function fetchSavedCollection(accessToken: string): Promise<{ items: { publication_id: string; saved_at: string }[] }> {
+  return request<{ items: { publication_id: string; saved_at: string }[] }>('/collections/saved', { accessToken });
+}
+
+export async function savePublication(accessToken: string, publicationId: string): Promise<void> {
+  await request(`/collections/saved/${publicationId}`, { method: 'PUT', accessToken });
+}
+
+export async function unsavePublication(accessToken: string, publicationId: string): Promise<void> {
+  await request(`/collections/saved/${publicationId}`, { method: 'DELETE', accessToken, expectJson: false });
+}
+
 export async function createGenerationTask(
   accessToken: string,
   payload: StudioGenerationRequest,
@@ -185,12 +274,23 @@ function buildProviderPayload(payload: StudioGenerationRequest): Record<string, 
   };
 }
 
-async function request<T>(
+async function uploadMedia(path: string, accessToken: string, file: File): Promise<MediaUploadResponse> {
+  const body = new FormData();
+  body.append('file', file);
+  return request<MediaUploadResponse>(path, {
+    method: 'POST',
+    accessToken,
+    body,
+    skipJsonContentType: true,
+  });
+}
+
+async function request<T = unknown>(
   path: string,
-  options: RequestInit & { accessToken?: string } = {},
+  options: RequestInit & { accessToken?: string; skipJsonContentType?: boolean; expectJson?: boolean } = {},
 ): Promise<T> {
   const headers = new Headers(options.headers);
-  headers.set('Content-Type', 'application/json');
+  if (!options.skipJsonContentType) headers.set('Content-Type', 'application/json');
   if (options.accessToken) headers.set('Authorization', `Bearer ${options.accessToken}`);
 
   const response = await fetch(`${CORE_API_URL}${path}`, {
@@ -210,5 +310,8 @@ async function request<T>(
     throw new Error(detail);
   }
 
+  if (options.expectJson === false || response.status === 204) {
+    return undefined as T;
+  }
   return response.json() as Promise<T>;
 }

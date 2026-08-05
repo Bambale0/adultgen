@@ -9,7 +9,9 @@ from adultgen.api.routers import (
     auth,
     collections,
     generations,
+    media,
     profiles,
+    publications,
     system,
     workspace,
 )
@@ -31,6 +33,8 @@ def create_app() -> FastAPI:
     app.include_router(workspace.router)
     app.include_router(profiles.router)
     app.include_router(collections.router)
+    app.include_router(media.router)
+    app.include_router(publications.router)
     app.include_router(admin.router)
 
     return app
