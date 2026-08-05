@@ -3,6 +3,7 @@
 import uuid
 from typing import Annotated
 
+import httpx
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
@@ -15,7 +16,12 @@ from adultgen.config import Settings
 from adultgen.db.models.media import MediaAsset, MediaDerivative
 from adultgen.domain.media_storage import MediaBucketRole
 from adultgen.security.tokens import AccessTokenClaims, TokenError, verify_access_token
-from adultgen.services.media import MediaServiceError, UploadMediaCommand, upload_media_asset
+from adultgen.services.media import (
+    MediaServiceError,
+    UploadMediaCommand,
+    import_external_media_asset,
+    upload_media_asset,
+)
 from adultgen.services.media_derivatives import (
     MediaDerivativeError,
     MediaDerivativeVariant,
@@ -26,6 +32,7 @@ from adultgen.storage.ports import ObjectStorage
 router = APIRouter(prefix="/media", tags=["media"])
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+MAX_PROVIDER_IMPORT_BYTES = 100 * 1024 * 1024
 
 
 @router.post("/uploads/temporary", response_model=MediaUploadResponse)
@@ -66,6 +73,46 @@ async def upload_reference_media(
         file=file,
         role=MediaBucketRole.REFERENCES,
     )
+
+
+@router.post("/assets/{asset_id}/import-external", response_model=MediaAssetResponse)
+async def import_external_media(
+    asset_id: uuid.UUID,
+    claims: Annotated[AccessTokenClaims, Depends(get_current_token_claims)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    storage: Annotated[ObjectStorage, Depends(get_object_storage)],
+) -> MediaAssetResponse:
+    """Import provider-CDN result media into configured object storage."""
+
+    asset = await _get_asset(session, asset_id)
+    if asset.owner_user_id != claims.subject:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Media asset is not owned by user.")
+    if not asset.external_url:
+        return _asset_response(asset)
+
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.get(asset.external_url)
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to fetch provider media.") from exc
+
+    raw = response.content
+    if len(raw) > MAX_PROVIDER_IMPORT_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Provider media is too large.")
+
+    try:
+        imported = await import_external_media_asset(
+            session,
+            storage=storage,
+            asset_id=asset.id,
+            raw=raw,
+            content_type=response.headers.get("content-type"),
+        )
+    except MediaServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return _asset_response(imported)
 
 
 @router.post("/assets/{asset_id}/derivatives/{variant}", response_model=MediaDerivativeResponse)
