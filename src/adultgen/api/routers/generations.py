@@ -16,11 +16,13 @@ from adultgen.api.schemas.generations import (
 )
 from adultgen.db.models.generations import GenerationTask, SceneTake
 from adultgen.db.models.media import MediaAsset
+from adultgen.domain.adult_policy import AdultPolicyAction, evaluate_request_payload
 from adultgen.domain.model_capabilities import CapabilityValidationError
 from adultgen.domain.pricing import PricingError
 from adultgen.domain.wallet_ledger import WalletLedgerError
 from adultgen.security.tokens import AccessTokenClaims
 from adultgen.services.generations import GenerationServiceError, create_generation_task_with_reserve
+from adultgen.services.moderation import create_policy_moderation_case
 
 router = APIRouter(prefix="/generations", tags=["generations"])
 
@@ -32,6 +34,22 @@ async def create_generation_task(
     claims: Annotated[AccessTokenClaims, Depends(get_current_token_claims)],
 ) -> GenerationTaskResponse:
     """Create a generation task and reserve credits before provider submission."""
+
+    policy_decision = evaluate_request_payload(
+        payload.request_payload,
+        surface="generation_submit",
+    )
+    if policy_decision.action == AdultPolicyAction.BLOCK:
+        await create_policy_moderation_case(
+            session,
+            user_id=claims.subject,
+            decision=policy_decision,
+            surface="generation_submit",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Generation request violates adult content policy.",
+        )
 
     try:
         task = await create_generation_task_with_reserve(
@@ -47,6 +65,14 @@ async def create_generation_task(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except WalletLedgerError as exc:
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
+
+    if policy_decision.needs_review:
+        await create_policy_moderation_case(
+            session,
+            user_id=claims.subject,
+            decision=policy_decision,
+            surface="generation_submit",
+        )
 
     return await _task_response(session, task)
 
