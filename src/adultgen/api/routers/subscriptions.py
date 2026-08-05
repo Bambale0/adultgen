@@ -16,6 +16,7 @@ from adultgen.api.schemas.subscriptions import (
     SubscriptionResponse,
 )
 from adultgen.domain.subscription_plans import SubscriptionPlan
+from adultgen.security.tokens import AccessTokenClaims
 from adultgen.services.subscriptions import (
     SubscriptionServiceError,
     activate_subscription,
@@ -23,7 +24,6 @@ from adultgen.services.subscriptions import (
     get_active_subscription,
     list_plans,
 )
-from adultgen.services.tokens import TokenClaims
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
@@ -37,7 +37,7 @@ async def list_subscription_plan_catalog() -> SubscriptionPlanListResponse:
 
 @router.get("/me", response_model=SubscriptionResponse | None)
 async def get_my_subscription(
-    claims: Annotated[TokenClaims, Depends(get_current_token_claims)],
+    claims: Annotated[AccessTokenClaims, Depends(get_current_token_claims)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SubscriptionResponse | None:
     """Return the current user's active subscription, if present."""
@@ -49,7 +49,7 @@ async def get_my_subscription(
 @router.post("/activate", response_model=SubscriptionActivationResponse)
 async def activate_my_subscription(
     payload: ActivateSubscriptionRequest,
-    claims: Annotated[TokenClaims, Depends(get_current_token_claims)],
+    claims: Annotated[AccessTokenClaims, Depends(get_current_token_claims)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SubscriptionActivationResponse:
     """Activate an MVP subscription and grant current period credits."""
@@ -76,7 +76,7 @@ async def activate_my_subscription(
 
 @router.post("/me/cancel-at-period-end", response_model=SubscriptionResponse)
 async def cancel_my_subscription_at_period_end(
-    claims: Annotated[TokenClaims, Depends(get_current_token_claims)],
+    claims: Annotated[AccessTokenClaims, Depends(get_current_token_claims)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SubscriptionResponse:
     """Mark the current subscription to cancel at period end."""
