@@ -31,6 +31,7 @@ from adultgen.db.models.referrals import (
     PartnerWallet,
     ReferralRelation,
 )
+from adultgen.db.models.subscriptions import SubscriptionCreditGrant, UserSubscription
 from adultgen.db.models.users import AdultConsent, TelegramChannel, User, UserChannelActivity
 from adultgen.db.models.wallets import Wallet, WalletEntry
 
@@ -63,10 +64,12 @@ __all__ = [
     "Scene",
     "SceneReference",
     "SceneTake",
+    "SubscriptionCreditGrant",
     "TelegramChannel",
     "User",
     "UserChannelActivity",
     "UserProfile",
+    "UserSubscription",
     "Wallet",
     "WalletEntry",
 ]
