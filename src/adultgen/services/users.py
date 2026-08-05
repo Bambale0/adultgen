@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import uuid
 from dataclasses import dataclass
@@ -108,15 +109,56 @@ async def upsert_user_from_telegram(
         select(User).where(User.telegram_user_id == telegram_user.id)
     )
     user = result.scalar_one()
-    return AuthenticatedUser(
-        id=user.id,
-        telegram_user_id=user.telegram_user_id,
-        is_blocked=user.is_blocked,
-        can_generate=user.can_generate,
-        can_publish_profile=user.can_publish_profile,
-        can_publish_feed=user.can_publish_feed,
-        can_use_payments=user.can_use_payments,
+    return _authenticated_user_from_model(user)
+
+
+async def upsert_user_from_web_session(
+    session: AsyncSession,
+    *,
+    email: str,
+    display_name: str | None,
+) -> AuthenticatedUser:
+    """Create or update canonical user for the standalone website MVP.
+
+    The current canonical User table is keyed by ``telegram_user_id`` because the
+    first platform channel was Telegram. For the web-first MVP we reserve a
+    deterministic negative id namespace derived from email. A later migration can
+    split identities into a dedicated ``user_identities`` table without changing
+    access-token consumers.
+    """
+
+    normalized_email = email.strip().lower()
+    if not normalized_email:
+        raise UserServiceError("Email must not be empty.")
+
+    synthetic_telegram_id = _web_identity_to_reserved_telegram_id(normalized_email)
+    safe_display_name = (display_name or normalized_email.split("@", maxsplit=1)[0]).strip()
+    if not safe_display_name:
+        safe_display_name = "Web user"
+
+    user_values = {
+        "telegram_user_id": synthetic_telegram_id,
+        "username": None,
+        "first_name": safe_display_name[:120],
+        "last_name": None,
+        "language_code": "web",
+    }
+    insert_stmt = insert(User).values(**user_values)
+    await session.execute(
+        insert_stmt.on_conflict_do_update(
+            index_elements=[User.telegram_user_id],
+            set_={
+                "first_name": insert_stmt.excluded.first_name,
+                "language_code": insert_stmt.excluded.language_code,
+            },
+        )
     )
+
+    result = await session.execute(
+        select(User).where(User.telegram_user_id == synthetic_telegram_id)
+    )
+    user = result.scalar_one()
+    return _authenticated_user_from_model(user)
 
 
 async def record_user_channel_activity(
@@ -152,3 +194,21 @@ async def record_user_channel_activity(
             },
         )
     )
+
+
+def _authenticated_user_from_model(user: User) -> AuthenticatedUser:
+    return AuthenticatedUser(
+        id=user.id,
+        telegram_user_id=user.telegram_user_id,
+        is_blocked=user.is_blocked,
+        can_generate=user.can_generate,
+        can_publish_profile=user.can_publish_profile,
+        can_publish_feed=user.can_publish_feed,
+        can_use_payments=user.can_use_payments,
+    )
+
+
+def _web_identity_to_reserved_telegram_id(email: str) -> int:
+    digest = hashlib.sha256(email.encode()).digest()
+    numeric_id = int.from_bytes(digest[:7], byteorder="big")
+    return -numeric_id
