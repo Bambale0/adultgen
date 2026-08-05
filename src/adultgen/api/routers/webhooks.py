@@ -77,7 +77,10 @@ async def ingest_crocopay_payment_webhook(
     payload = _json_body(raw_body)
     client_secret = settings.crocopay_client_secret or settings.crocopay_secret
     if not client_secret:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="CrocoPay secret is not configured.")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="CrocoPay secret is not configured.",
+        )
 
     try:
         parsed = verify_crocopay_callback(payload, client_secret=client_secret)
@@ -113,7 +116,10 @@ async def ingest_crocopay_payment_webhook(
         )
         session.add(raw_processing)
         await session.flush()
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Callback is missing token or order_id.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Callback is missing token or order_id.",
+        )
 
     try:
         if token:
@@ -178,7 +184,7 @@ async def _record_payment_webhook(
     received_at = datetime.now(UTC)
     body_sha256 = hashlib.sha256(raw_body).hexdigest()
     event_hash = hashlib.sha256(
-        f"{provider.value}|{request.url.query}|{body_sha256}|{received_at.isoformat()}".encode("utf-8")
+        f"{provider.value}|{request.url.query}|{body_sha256}|{received_at.isoformat()}".encode()
     ).hexdigest()
     raw = PaymentWebhookRaw(
         provider=provider.value,
@@ -186,7 +192,7 @@ async def _record_payment_webhook(
         request_method=request.method,
         request_path=request.url.path,
         query_string=request.url.query,
-        headers={key: value for key, value in request.headers.items()},
+        headers=dict(request.headers.items()),
         raw_body=raw_body,
         source_ip=request.client.host if request.client else None,
         body_sha256=body_sha256,
@@ -213,7 +219,13 @@ def _json_body(raw_body: bytes) -> dict[str, Any]:
     try:
         parsed = json.loads(raw_body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Webhook body must be JSON.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Webhook body must be JSON.",
+        ) from exc
     if not isinstance(parsed, dict):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Webhook JSON body must be an object.")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Webhook JSON body must be an object.",
+        )
     return parsed
