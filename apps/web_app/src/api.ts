@@ -164,6 +164,20 @@ export type ProviderCheckoutResponse = {
   redirect_url: string;
 };
 
+export type WalletBucketBalance = {
+  bucket: string;
+  available: number;
+  reserved: number;
+};
+
+export type WalletBalance = {
+  currency: string;
+  total_available: number;
+  total_reserved: number;
+  total_balance: number;
+  buckets: WalletBucketBalance[];
+};
+
 const CORE_API_URL = import.meta.env.VITE_CORE_API_URL || '/api';
 
 export function coreMediaUrl(path: string): string {
@@ -333,6 +347,10 @@ export async function initiateCrocoPayCheckout(
     method: 'POST',
     accessToken,
   });
+}
+
+export async function fetchWalletBalance(accessToken: string): Promise<WalletBalance> {
+  return request<WalletBalance>('/wallet/me', { accessToken });
 }
 
 function getModelAndOperation(mode: GenerationMode): { model_code: string; operation: GenerationMode } {
