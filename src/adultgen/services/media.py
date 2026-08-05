@@ -20,6 +20,7 @@ from adultgen.domain.media_storage import (
     guess_mime_type,
     infer_media_type,
     plan_media_object,
+    sha256_hex,
 )
 from adultgen.storage.ports import ObjectStorage
 
@@ -124,6 +125,42 @@ async def register_external_media_asset(
         expires_at=resolved_now + timedelta(seconds=settings.media_temp_ttl_seconds),
     )
     session.add(asset)
+    await session.flush()
+    return asset
+
+
+async def import_external_media_asset(
+    session: AsyncSession,
+    *,
+    storage: ObjectStorage,
+    asset_id: uuid.UUID,
+    raw: bytes,
+    content_type: str | None = None,
+) -> MediaAsset:
+    """Persist external provider media bytes into configured object storage."""
+
+    if not raw:
+        raise MediaServiceError("External media import payload cannot be empty.")
+
+    asset = await _get_media_asset_for_update(session, asset_id)
+    if asset.deleted_at is not None:
+        raise MediaServiceError("Deleted media asset cannot be imported.")
+    if not asset.external_url:
+        return asset
+
+    resolved_mime_type = content_type or asset.mime_type
+    await storage.put_object(
+        bucket=asset.storage_bucket,
+        key=asset.storage_key,
+        body=raw,
+        content_type=resolved_mime_type,
+    )
+
+    asset.mime_type = resolved_mime_type
+    asset.media_type = infer_media_type(resolved_mime_type).value
+    asset.size_bytes = len(raw)
+    asset.checksum_sha256 = sha256_hex(raw)
+    asset.external_url = None
     await session.flush()
     return asset
 
