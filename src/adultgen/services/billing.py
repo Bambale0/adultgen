@@ -103,16 +103,61 @@ async def mark_payment_order_paid_by_callback_token(
     signature_valid: bool,
     now: datetime | None = None,
 ) -> PaidPaymentOrderResult:
-    """Mark a payment order as paid and credit purchased credits once."""
+    """Mark a payment order as paid by one-time callback token."""
 
+    order = await get_payment_order_by_callback_token(session, callback_token=callback_token, provider=provider)
+    return await _mark_payment_order_paid(
+        session,
+        order=order,
+        amount_minor=amount_minor,
+        signature_valid=signature_valid,
+        now=now,
+    )
+
+
+async def mark_payment_order_paid_by_id(
+    session: AsyncSession,
+    *,
+    order_id: uuid.UUID,
+    provider: PaymentProviderCode,
+    amount_minor: int,
+    signature_valid: bool,
+    now: datetime | None = None,
+) -> PaidPaymentOrderResult:
+    """Mark a payment order as paid by order id from provider callback URL."""
+
+    order = await get_payment_order_for_update(session, order_id)
+    if order.provider != provider.value:
+        raise BillingServiceError("Payment order provider does not match callback provider.")
+    return await _mark_payment_order_paid(
+        session,
+        order=order,
+        amount_minor=amount_minor,
+        signature_valid=signature_valid,
+        now=now,
+    )
+
+
+async def _mark_payment_order_paid(
+    session: AsyncSession,
+    *,
+    order: PaymentOrder,
+    amount_minor: int,
+    signature_valid: bool,
+    now: datetime | None,
+) -> PaidPaymentOrderResult:
     if not signature_valid:
         raise BillingServiceError("Payment callback signature is invalid.")
 
-    order = await get_payment_order_by_callback_token(session, callback_token=callback_token, provider=provider)
     current_status = PaymentOrderStatus(order.status)
     if current_status == PaymentOrderStatus.PAID:
         return PaidPaymentOrderResult(order=order, credited_now=False)
-    if current_status in {PaymentOrderStatus.FAILED, PaymentOrderStatus.CANCELLED, PaymentOrderStatus.REFUNDED, PaymentOrderStatus.CHARGEBACK}:
+    if current_status in {
+        PaymentOrderStatus.FAILED,
+        PaymentOrderStatus.CANCELLED,
+        PaymentOrderStatus.REFUNDED,
+        PaymentOrderStatus.CHARGEBACK,
+    }:
         raise BillingServiceError("Payment order is terminal and cannot be paid.")
     if amount_minor != order.amount_minor:
         raise BillingServiceError("Payment callback amount does not match order amount.")
