@@ -82,7 +82,8 @@ async def get_media_asset_content(
     if asset is None or asset.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media asset not found.")
 
-    if asset.storage_bucket != settings.s3_published_bucket:
+    is_published = asset.storage_bucket == settings.s3_published_bucket
+    if not is_published:
         claims = _optional_claims(authorization, settings=settings)
         if claims is None or asset.owner_user_id != claims.subject:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Media asset is private.")
@@ -100,7 +101,7 @@ async def get_media_asset_content(
         content=stored.body,
         media_type=stored.content_type,
         headers={
-            "Cache-Control": "public, max-age=300" if asset.storage_bucket == settings.s3_published_bucket else "no-store",
+            "Cache-Control": "public, max-age=300" if is_published else "no-store",
             "X-AdultGen-Media-Id": str(asset.id),
         },
     )
