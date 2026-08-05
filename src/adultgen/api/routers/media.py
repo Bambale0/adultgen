@@ -4,6 +4,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -107,8 +108,7 @@ async def get_media_asset_content(
     """Serve media bytes through the Core API delivery boundary.
 
     Published media is public by UUID. Temporary/reference media requires the owning
-    user's bearer token. This keeps the web app simple while preserving private refs.
-    Production can replace this with signed CDN/S3 URLs without changing feed schema.
+    user's bearer token. Provider-CDN results are exposed through a short redirect.
     """
 
     asset = await _get_asset(session, asset_id)
@@ -120,6 +120,13 @@ async def get_media_asset_content(
         claims = _optional_claims(authorization, settings=settings)
         if claims is None or asset.owner_user_id != claims.subject:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Media asset is private.")
+
+    if asset.external_url:
+        return RedirectResponse(
+            url=asset.external_url,
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+            headers={"Cache-Control": "no-store", "X-AdultGen-Media-Id": str(asset.id)},
+        )
 
     try:
         stored = await storage.get_object(

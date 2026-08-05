@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     kie_api_base_url: str = Field(default="https://api.kie.ai", alias="KIE_API_BASE_URL")
     kie_api_key: str = Field(alias="KIE_API_KEY")
     kie_callback_url: str = Field(alias="KIE_CALLBACK_URL")
+    kie_webhook_secret: str = Field(default="", alias="KIE_WEBHOOK_SECRET")
 
     billing_base_url: str = Field(alias="BILLING_BASE_URL")
     sharpay_api_key: str = Field(alias="SHARPAY_API_KEY")
