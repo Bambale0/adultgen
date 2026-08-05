@@ -17,7 +17,7 @@ class AdminAuditEvent(Base, CreatedAtMixin):
     __tablename__ = "admin_audit_events"
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    admin_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    admin_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     target_type: Mapped[str] = mapped_column(Text, nullable=False)
     target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     action: Mapped[str] = mapped_column(Text, nullable=False)
