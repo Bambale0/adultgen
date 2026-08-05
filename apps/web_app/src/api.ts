@@ -93,6 +93,13 @@ export type StudioGenerationRequest = {
   scene_id?: string;
 };
 
+export type GenerationResultAsset = {
+  asset_id: string;
+  role: string;
+  media_url: string;
+  is_external: boolean;
+};
+
 export type GenerationTask = {
   id: string;
   status: string;
@@ -104,6 +111,11 @@ export type GenerationTask = {
   provider_task_id: string | null;
   error_code: string | null;
   error_message: string | null;
+  results: GenerationResultAsset[];
+};
+
+export type GenerationListResponse = {
+  items: GenerationTask[];
 };
 
 export type Profile = {
@@ -170,6 +182,13 @@ export async function uploadReferenceMedia(accessToken: string, file: File): Pro
   return uploadMedia('/media/uploads/references', accessToken, file);
 }
 
+export async function importExternalMedia(accessToken: string, assetId: string): Promise<MediaAsset> {
+  return request<MediaAsset>(`/media/assets/${assetId}/import-external`, {
+    method: 'POST',
+    accessToken,
+  });
+}
+
 export async function createPublication(
   accessToken: string,
   payload: {
@@ -227,6 +246,14 @@ export async function createGenerationTask(
       request_payload: buildProviderPayload(payload),
     }),
   });
+}
+
+export async function fetchGenerationTask(accessToken: string, taskId: string): Promise<GenerationTask> {
+  return request<GenerationTask>(`/generations/${taskId}`, { accessToken });
+}
+
+export async function fetchMyGenerations(accessToken: string, limit = 30): Promise<GenerationListResponse> {
+  return request<GenerationListResponse>(`/generations?limit=${limit}`, { accessToken });
 }
 
 export async function fetchMyProfile(accessToken: string): Promise<Profile> {
