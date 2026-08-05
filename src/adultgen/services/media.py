@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlparse
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +17,8 @@ from adultgen.domain.media_storage import (
     BucketNames,
     MediaBucketRole,
     MediaStorageError,
+    guess_media_type,
+    guess_mime_type,
     plan_media_object,
 )
 from adultgen.storage.ports import ObjectStorage
@@ -80,6 +84,50 @@ async def upload_media_asset(
     return asset
 
 
+async def register_external_media_asset(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    owner_user_id: uuid.UUID | None,
+    external_url: str,
+    filename: str | None = None,
+    mime_type: str | None = None,
+    now: datetime | None = None,
+) -> MediaAsset:
+    """Register provider/CDN media URL as a temporary MediaAsset.
+
+    The actual bytes can be imported into S3 later by a media worker. Until then,
+    delivery redirects to the provider URL while keeping normal ownership/TTL rules.
+    """
+
+    parsed = urlparse(external_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise MediaServiceError("External media URL must be an absolute http(s) URL.")
+
+    resolved_now = now or datetime.now(UTC)
+    resolved_filename = filename or parsed.path.rsplit("/", maxsplit=1)[-1] or "provider-result"
+    resolved_mime_type = mime_type or guess_mime_type(resolved_filename)
+    media_type = guess_media_type(resolved_mime_type)
+    url_hash = hashlib.sha256(external_url.encode("utf-8")).hexdigest()
+    storage_key = f"external/{url_hash}/{resolved_filename}"
+
+    asset = MediaAsset(
+        owner_user_id=owner_user_id,
+        storage_bucket=settings.s3_temp_bucket,
+        storage_key=storage_key,
+        media_type=media_type.value,
+        mime_type=resolved_mime_type,
+        size_bytes=None,
+        checksum_sha256=None,
+        external_url=external_url,
+        is_temporary=True,
+        expires_at=resolved_now + timedelta(seconds=settings.media_temp_ttl_seconds),
+    )
+    session.add(asset)
+    await session.flush()
+    return asset
+
+
 async def promote_media_asset_to_published(
     session: AsyncSession,
     *,
@@ -95,6 +143,8 @@ async def promote_media_asset_to_published(
         raise MediaServiceError("Deleted media asset cannot be promoted.")
     if asset.storage_bucket == settings.s3_published_bucket and not asset.is_temporary:
         return asset
+    if asset.external_url:
+        raise MediaServiceError("External provider media must be imported before publishing.")
 
     target_key = asset.storage_key.replace("temporary/", "published/", 1)
     if target_key == asset.storage_key:
@@ -129,7 +179,8 @@ async def mark_media_asset_deleted(
     if asset.deleted_at is not None:
         return asset
 
-    await storage.delete_object(bucket=asset.storage_bucket, key=asset.storage_key)
+    if not asset.external_url:
+        await storage.delete_object(bucket=asset.storage_bucket, key=asset.storage_key)
     asset.deleted_at = now or datetime.now(UTC)
     await session.flush()
     return asset
