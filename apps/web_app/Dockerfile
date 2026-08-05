@@ -3,7 +3,7 @@ FROM node:24-alpine AS build
 
 WORKDIR /app
 
-COPY apps/web_app/package.json apps/web_app/package-lock.json* ./
+COPY apps/web_app/package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 COPY apps/web_app ./
