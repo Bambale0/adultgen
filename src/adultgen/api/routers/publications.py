@@ -1,6 +1,5 @@
 """Publication and feed API routes."""
 
-import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
