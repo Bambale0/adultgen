@@ -47,4 +47,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://127.0.0.1:${API_PORT}/health || exit 1
 
-CMD ["sh", "-c", "uvicorn adultgen.apps.core_api:app --host ${API_HOST} --port ${API_PORT}"]
+CMD ["sh", "-c", "uvicorn adultgen.apps.core_api:app --host ${API_HOST} --port ${API_PORT} --proxy-headers --forwarded-allow-ips '*'"]
