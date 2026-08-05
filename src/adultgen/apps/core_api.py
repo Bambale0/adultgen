@@ -11,6 +11,7 @@ from adultgen.api.routers import (
     collections,
     generations,
     media,
+    moderation,
     profiles,
     publications,
     subscriptions,
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(billing.router)
     app.include_router(wallets.router)
     app.include_router(subscriptions.router)
+    app.include_router(moderation.router)
     app.include_router(webhooks.router)
     app.include_router(admin.router)
 

@@ -13,8 +13,11 @@ from adultgen.api.storage import get_object_storage
 from adultgen.config import Settings
 from adultgen.db.models.media import MediaDerivative
 from adultgen.db.models.publications import Publication
+from adultgen.domain.adult_policy import AdultPolicyAction, evaluate_request_payload
+from adultgen.domain.enums import PublicationVisibility
 from adultgen.security.tokens import AccessTokenClaims
 from adultgen.services.media_derivatives import MediaDerivativeVariant
+from adultgen.services.moderation import create_policy_moderation_case
 from adultgen.services.publications import (
     PublicationServiceError,
     create_publication,
@@ -36,6 +39,28 @@ async def publish_media(
 ) -> PublicationResponse:
     """Publish owned media into profile or common feed."""
 
+    policy_decision = evaluate_request_payload(
+        {
+            "title": payload.title or "",
+            "description": payload.description or "",
+        },
+        surface="publication_submit",
+        is_public=payload.visibility == PublicationVisibility.FEED,
+    )
+    if policy_decision.action == AdultPolicyAction.BLOCK:
+        await create_policy_moderation_case(
+            session,
+            user_id=claims.subject,
+            decision=policy_decision,
+            surface="publication_submit",
+        )
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Publication violates adult content policy.",
+        )
+
+    blur_required = payload.blur_required or payload.is_explicit or policy_decision.needs_review
     try:
         publication = await create_publication(
             session,
@@ -49,12 +74,21 @@ async def publish_media(
             project_id=payload.project_id,
             scene_take_id=payload.scene_take_id,
             is_explicit=payload.is_explicit,
-            blur_required=payload.blur_required,
+            blur_required=blur_required,
             allow_remix=payload.allow_remix,
             prompt_public=payload.prompt_public,
         )
     except PublicationServiceError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if policy_decision.needs_review:
+        await create_policy_moderation_case(
+            session,
+            user_id=claims.subject,
+            decision=policy_decision,
+            surface="publication_submit",
+            publication_id=publication.id,
+        )
 
     return await _publication_response(session, publication)
 

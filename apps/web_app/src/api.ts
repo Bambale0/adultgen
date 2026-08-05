@@ -178,6 +178,25 @@ export type WalletBalance = {
   buckets: WalletBucketBalance[];
 };
 
+export type ModerationCase = {
+  id: string;
+  publication_id: string | null;
+  reported_user_id: string | null;
+  reporter_user_id: string | null;
+  category: string;
+  description: string | null;
+  status: string;
+  priority: number;
+  resolution: string | null;
+  resolved_by_admin_id: string | null;
+  resolved_at: string | null;
+  created_at: string;
+};
+
+export type ModerationQueueResponse = {
+  items: ModerationCase[];
+};
+
 const CORE_API_URL = import.meta.env.VITE_CORE_API_URL || '/api';
 
 export function coreMediaUrl(path: string): string {
@@ -280,6 +299,38 @@ export async function savePublication(accessToken: string, publicationId: string
 
 export async function unsavePublication(accessToken: string, publicationId: string): Promise<void> {
   await request(`/collections/saved/${publicationId}`, { method: 'DELETE', accessToken, expectJson: false });
+}
+
+export async function reportPublication(
+  accessToken: string,
+  publicationId: string,
+  category: string,
+  description?: string,
+): Promise<ModerationCase> {
+  return request<ModerationCase>(`/publications/${publicationId}/reports`, {
+    method: 'POST',
+    accessToken,
+    body: JSON.stringify({ category, description: description ?? null }),
+  });
+}
+
+export async function fetchAdminModerationCases(adminToken: string, limit = 50): Promise<ModerationQueueResponse> {
+  return request<ModerationQueueResponse>(`/admin/moderation/cases?limit=${limit}`, {
+    accessToken: adminToken,
+  });
+}
+
+export async function resolveAdminModerationCase(
+  adminToken: string,
+  caseId: string,
+  action: 'resolve' | 'reject' | 'hide_publication',
+  resolution: string,
+): Promise<ModerationCase> {
+  return request<ModerationCase>(`/admin/moderation/cases/${caseId}/resolve`, {
+    method: 'POST',
+    accessToken: adminToken,
+    body: JSON.stringify({ action, resolution }),
+  });
 }
 
 export async function createGenerationTask(
