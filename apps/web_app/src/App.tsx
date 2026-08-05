@@ -1,17 +1,28 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 
 import {
   acceptAdultConsent,
   createGenerationTask,
+  createPublication,
   createStarterWorkspace,
   createWebSession,
   fetchAdultConsent,
+  fetchFeed,
   fetchMyProfile,
+  fetchMyPublications,
+  fetchSavedCollection,
+  savePublication,
   updateMyProfile,
+  uploadReferenceMedia,
+  uploadTemporaryMedia,
   type AdultConsentStatus,
+  type FeedResponse,
   type GenerationMode,
   type GenerationTask,
+  type MediaAsset,
   type Profile,
+  type Publication,
+  type PublicationVisibility,
   type WebSession,
 } from './api';
 import { findRouteByPath, primaryWebAppRoutes, webAppRoutes, type WebAppRoute } from './routes';
@@ -60,8 +71,15 @@ export function App() {
   const [latestTask, setLatestTask] = useState<GenerationTask | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [studio, setStudio] = useState<StudioState>(defaultStudioState);
+  const [uploadedAssets, setUploadedAssets] = useState<MediaAsset[]>([]);
+  const [myPublications, setMyPublications] = useState<Publication[]>([]);
+  const [feed, setFeed] = useState<FeedResponse>({ items: [] });
+  const [savedItems, setSavedItems] = useState<{ publication_id: string; saved_at: string }[]>([]);
   const [email, setEmail] = useState('creator@example.com');
   const [displayName, setDisplayName] = useState('AdultGen creator');
+  const [publishTitle, setPublishTitle] = useState('Web Studio result');
+  const [publishDescription, setPublishDescription] = useState('Generated and published from AdultGen website app.');
+  const [publishVisibility, setPublishVisibility] = useState<PublicationVisibility>('feed');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const routeBlockedByAuth = activeRoute.requiresAuth && !session;
@@ -132,6 +150,66 @@ export function App() {
     if (result) setLatestTask(result);
   }
 
+  async function handleUploadMedia(event: ChangeEvent<HTMLInputElement>, kind: 'temporary' | 'reference') {
+    const file = event.target.files?.[0];
+    if (!session || !file) return;
+    const result = await runAction(`Загружаем ${kind === 'reference' ? 'референс' : 'temp media'}…`, () =>
+      kind === 'reference' ? uploadReferenceMedia(session.access_token, file) : uploadTemporaryMedia(session.access_token, file),
+    );
+    if (result) setUploadedAssets((items) => [result.asset, ...items]);
+    event.target.value = '';
+  }
+
+  async function handlePublishLatestAsset() {
+    if (!session) return;
+    const asset = uploadedAssets[0];
+    if (!asset) {
+      setErrorMessage('Сначала загрузи media asset.');
+      return;
+    }
+
+    const publication = await runAction('Публикуем media asset…', () =>
+      createPublication(session.access_token, {
+        asset_id: asset.id,
+        title: publishTitle,
+        description: publishDescription,
+        visibility: publishVisibility,
+        is_explicit: true,
+        blur_required: true,
+        allow_remix: true,
+        prompt_public: false,
+        project_id: workspace?.project_id ?? null,
+      }),
+    );
+    if (!publication) return;
+    setMyPublications((items) => [publication, ...items]);
+    if (publication.visibility === 'feed') setFeed((current) => ({ items: [publication, ...current.items] }));
+  }
+
+  async function handleRefreshFeed() {
+    const result = await runAction('Загружаем feed…', () => fetchFeed());
+    if (result) setFeed(result);
+  }
+
+  async function handleSavePublication(publicationId: string) {
+    if (!session) return;
+    await runAction('Сохраняем публикацию в коллекцию…', () => savePublication(session.access_token, publicationId));
+    const collection = await fetchSavedCollection(session.access_token);
+    setSavedItems(collection.items);
+  }
+
+  async function handleRefreshCollection() {
+    if (!session) return;
+    const result = await runAction('Загружаем коллекцию…', () => fetchSavedCollection(session.access_token));
+    if (result) setSavedItems(result.items);
+  }
+
+  async function handleRefreshMyPublications() {
+    if (!session) return;
+    const result = await runAction('Загружаем мои публикации…', () => fetchMyPublications(session.access_token));
+    if (result) setMyPublications(result.items);
+  }
+
   async function handleLoadProfile() {
     if (!session) return;
     const result = await runAction('Загружаем профиль…', () => fetchMyProfile(session.access_token));
@@ -159,6 +237,10 @@ export function App() {
     setWorkspace(null);
     setLatestTask(null);
     setProfile(null);
+    setUploadedAssets([]);
+    setMyPublications([]);
+    setFeed({ items: [] });
+    setSavedItems([]);
     setActiveRoute(webAppRoutes[0]);
   }
 
@@ -169,7 +251,7 @@ export function App() {
           <p className="eyebrow">AdultGen</p>
           <h1>AI Studio</h1>
           <p className="sidebar-copy">
-            Основной продукт — сайт-приложение: генерация, проекты, лента, профиль и биллинг.
+            Основной продукт — сайт-приложение: генерация, медиа, публикации, лента, профиль и биллинг.
             Telegram остаётся companion-каналом для уведомлений, deep links и поддержки.
           </p>
         </div>
@@ -224,14 +306,30 @@ export function App() {
             setStudio={setStudio}
             workspace={workspace}
             latestTask={latestTask}
+            uploadedAssets={uploadedAssets}
             onPrepareWorkspace={() => void handlePrepareWorkspace()}
             onLaunch={() => void handleLaunchGeneration()}
+            onUploadReference={(event) => void handleUploadMedia(event, 'reference')}
+            onUploadTemporary={(event) => void handleUploadMedia(event, 'temporary')}
+            onPublishLatestAsset={() => void handlePublishLatestAsset()}
+            publishTitle={publishTitle}
+            publishDescription={publishDescription}
+            publishVisibility={publishVisibility}
+            setPublishTitle={setPublishTitle}
+            setPublishDescription={setPublishDescription}
+            setPublishVisibility={setPublishVisibility}
           />
+        ) : activeRoute.id === 'feed' ? (
+          <FeedCard feed={feed} onRefresh={() => void handleRefreshFeed()} onSave={(id) => void handleSavePublication(id)} />
+        ) : activeRoute.id === 'collection' ? (
+          <CollectionCard savedItems={savedItems} onRefresh={() => void handleRefreshCollection()} />
         ) : activeRoute.id === 'profile' ? (
           <ProfileCard
             profile={profile}
+            publications={myPublications}
             onLoad={() => void handleLoadProfile()}
             onToggleVisibility={() => void handleToggleProfileVisibility()}
+            onRefreshPublications={() => void handleRefreshMyPublications()}
           />
         ) : (
           <ProductSection route={activeRoute} session={session} adultConsent={adultConsent} latestTask={latestTask} />
@@ -345,14 +443,14 @@ function LandingCard({ onStart }: { onStart: () => void }) {
         <p className="eyebrow">Web-first adult AI generation</p>
         <h3>Сайт как основной продукт, Telegram как companion</h3>
         <p>
-          UX строится вокруг генератора: prompt, negative prompt, референсы, аватары,
-          проекты, лента, коллекция, профиль, биллинг и партнёрский кабинет.
+          UX строится вокруг генератора: prompt, negative prompt, uploads, референсы, проекты,
+          лента, коллекция, профиль, биллинг и партнёрский кабинет.
         </p>
         <button className="primary-button" type="button" onClick={onStart}>
           Открыть Studio
         </button>
       </div>
-      <MetricCard label="Core API" value="ready" text="Auth, generation, workspace, profiles, collection." />
+      <MetricCard label="Media" value="upload" text="Reference/temp uploads и publication flow." />
       <MetricCard label="Safety" value="18+" text="Adult gate и запретные категории до контента." />
       <MetricCard label="Models" value="Kie" text="Seedream 5 Pro + Seedance 2.0 через capability layer." />
     </section>
@@ -364,15 +462,35 @@ function StudioCard({
   setStudio,
   workspace,
   latestTask,
+  uploadedAssets,
   onPrepareWorkspace,
   onLaunch,
+  onUploadReference,
+  onUploadTemporary,
+  onPublishLatestAsset,
+  publishTitle,
+  publishDescription,
+  publishVisibility,
+  setPublishTitle,
+  setPublishDescription,
+  setPublishVisibility,
 }: {
   studio: StudioState;
   setStudio: (value: StudioState) => void;
   workspace: WorkspaceDraft | null;
   latestTask: GenerationTask | null;
+  uploadedAssets: MediaAsset[];
   onPrepareWorkspace: () => void;
   onLaunch: () => void;
+  onUploadReference: (event: ChangeEvent<HTMLInputElement>) => void;
+  onUploadTemporary: (event: ChangeEvent<HTMLInputElement>) => void;
+  onPublishLatestAsset: () => void;
+  publishTitle: string;
+  publishDescription: string;
+  publishVisibility: PublicationVisibility;
+  setPublishTitle: (value: string) => void;
+  setPublishDescription: (value: string) => void;
+  setPublishVisibility: (value: PublicationVisibility) => void;
 }) {
   const estimatedCredits = estimateCredits(studio.mode, studio.duration_seconds);
 
@@ -397,11 +515,7 @@ function StudioCard({
         </label>
         <label>
           Prompt
-          <textarea
-            rows={5}
-            value={studio.prompt}
-            onChange={(event) => setStudio({ ...studio, prompt: event.target.value })}
-          />
+          <textarea rows={5} value={studio.prompt} onChange={(event) => setStudio({ ...studio, prompt: event.target.value })} />
         </label>
         <label>
           Negative prompt
@@ -412,7 +526,7 @@ function StudioCard({
           />
         </label>
         <label>
-          Reference URLs, по одному на строку
+          External reference URLs, по одному на строку
           <textarea
             rows={3}
             value={studio.reference_urls}
@@ -422,22 +536,15 @@ function StudioCard({
         <div className="form-grid">
           <label>
             Aspect ratio
-            <select
-              value={studio.aspect_ratio}
-              onChange={(event) => setStudio({ ...studio, aspect_ratio: event.target.value })}
-            >
+            <select value={studio.aspect_ratio} onChange={(event) => setStudio({ ...studio, aspect_ratio: event.target.value })}>
               <option value="9:16">9:16</option>
               <option value="16:9">16:9</option>
               <option value="1:1">1:1</option>
-              <option value="4:5">4:5</option>
             </select>
           </label>
           <label>
             Resolution
-            <select
-              value={studio.resolution}
-              onChange={(event) => setStudio({ ...studio, resolution: event.target.value })}
-            >
+            <select value={studio.resolution} onChange={(event) => setStudio({ ...studio, resolution: event.target.value })}>
               <option value="720p">720p</option>
               <option value="1080p">1080p</option>
             </select>
@@ -452,57 +559,145 @@ function StudioCard({
               onChange={(event) => setStudio({ ...studio, duration_seconds: Number(event.target.value) })}
             />
           </label>
-        </div>
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={studio.generate_audio}
-            onChange={(event) => setStudio({ ...studio, generate_audio: event.target.checked })}
-          />
-          Generate audio for video
-        </label>
-        <div className="button-row">
-          <button className="ghost-button" type="button" onClick={onPrepareWorkspace}>
-            Подготовить проект
-          </button>
-          <button className="primary-button" type="button" onClick={onLaunch}>
-            Запустить за ~{estimatedCredits} credits
-          </button>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={studio.generate_audio}
+              onChange={(event) => setStudio({ ...studio, generate_audio: event.target.checked })}
+            />
+            Generate audio
+          </label>
         </div>
       </form>
 
-      <aside className="card stack-card preview-card">
-        <p className="eyebrow">Preview / state</p>
-        <h3>Контроль перед запуском</h3>
-        <StateRow label="Workspace" value={workspace ? 'готов' : 'не создан'} />
-        <StateRow label="Mode" value={studio.mode} />
-        <StateRow label="Estimated credits" value={String(estimatedCredits)} />
-        <StateRow label="Latest task" value={latestTask ? `${latestTask.status} · ${latestTask.id}` : 'нет'} />
-        <p className="hint">
-          Для Seedance режимы first frame, first+last и multimodal refs считаются отдельными режимами.
-          Studio не смешивает их в один payload.
-        </p>
+      <aside className="card stack-card">
+        <p className="eyebrow">Media + Publish</p>
+        <h3>Uploads и публикация</h3>
+        <label>
+          Reference upload
+          <input type="file" accept="image/*,video/*,audio/*" onChange={onUploadReference} />
+        </label>
+        <label>
+          Temporary result upload
+          <input type="file" accept="image/*,video/*" onChange={onUploadTemporary} />
+        </label>
+        <AssetList assets={uploadedAssets} />
+        <label>
+          Publish title
+          <input value={publishTitle} onChange={(event) => setPublishTitle(event.target.value)} />
+        </label>
+        <label>
+          Publish description
+          <textarea rows={3} value={publishDescription} onChange={(event) => setPublishDescription(event.target.value)} />
+        </label>
+        <label>
+          Куда публиковать
+          <select value={publishVisibility} onChange={(event) => setPublishVisibility(event.target.value as PublicationVisibility)}>
+            <option value="profile">Только профиль</option>
+            <option value="feed">Общая лента</option>
+          </select>
+        </label>
+        <button className="ghost-button" type="button" onClick={onPublishLatestAsset}>
+          Опубликовать последний upload
+        </button>
       </aside>
+
+      <aside className="card stack-card">
+        <p className="eyebrow">Run summary</p>
+        <h3>{estimatedCredits} credits</h3>
+        <p>Сначала создаём workspace, затем generation task с резервом кредитов.</p>
+        <div className="button-row">
+          <button className="ghost-button" type="button" onClick={onPrepareWorkspace}>
+            Подготовить workspace
+          </button>
+          <button className="primary-button" type="button" onClick={onLaunch}>
+            Запустить генерацию
+          </button>
+        </div>
+        {workspace && <CodeBlock value={JSON.stringify(workspace, null, 2)} />}
+        {latestTask && <CodeBlock value={JSON.stringify(latestTask, null, 2)} />}
+      </aside>
+    </section>
+  );
+}
+
+function AssetList({ assets }: { assets: MediaAsset[] }) {
+  if (assets.length === 0) return <p className="muted-text">Пока нет загруженных assets.</p>;
+  return (
+    <div className="item-list">
+      {assets.slice(0, 5).map((asset) => (
+        <div className="item-row" key={asset.id}>
+          <strong>{asset.media_type}</strong>
+          <span>{asset.mime_type}</span>
+          <small>{asset.id}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FeedCard({
+  feed,
+  onRefresh,
+  onSave,
+}: {
+  feed: FeedResponse;
+  onRefresh: () => void;
+  onSave: (publicationId: string) => void;
+}) {
+  return (
+    <section className="card stack-card">
+      <p className="eyebrow">Common Feed</p>
+      <h3>Лента публикаций</h3>
+      <button className="primary-button" type="button" onClick={onRefresh}>
+        Обновить ленту
+      </button>
+      <PublicationList publications={feed.items} onSave={onSave} />
+    </section>
+  );
+}
+
+function CollectionCard({ savedItems, onRefresh }: { savedItems: { publication_id: string; saved_at: string }[]; onRefresh: () => void }) {
+  return (
+    <section className="card stack-card">
+      <p className="eyebrow">Saved Collection</p>
+      <h3>Коллекция</h3>
+      <button className="primary-button" type="button" onClick={onRefresh}>
+        Обновить коллекцию
+      </button>
+      <div className="item-list">
+        {savedItems.length === 0 ? (
+          <p className="muted-text">Пока ничего не сохранено.</p>
+        ) : (
+          savedItems.map((item) => (
+            <div className="item-row" key={item.publication_id}>
+              <strong>{item.publication_id}</strong>
+              <span>{new Date(item.saved_at).toLocaleString()}</span>
+            </div>
+          ))
+        )}
+      </div>
     </section>
   );
 }
 
 function ProfileCard({
   profile,
+  publications,
   onLoad,
   onToggleVisibility,
+  onRefreshPublications,
 }: {
   profile: Profile | null;
+  publications: Publication[];
   onLoad: () => void;
   onToggleVisibility: () => void;
+  onRefreshPublications: () => void;
 }) {
   return (
     <section className="card stack-card">
-      <p className="eyebrow">Creator profile</p>
-      <h3>Публичный / приватный профиль</h3>
-      <StateRow label="Public ID" value={profile?.public_id ?? 'ещё не загружен'} />
-      <StateRow label="Visibility" value={profile?.visibility ?? 'unknown'} />
-      <StateRow label="Display name" value={profile?.display_name ?? 'not set'} />
+      <p className="eyebrow">Creator Profile</p>
+      <h3>Профиль автора</h3>
       <div className="button-row">
         <button className="ghost-button" type="button" onClick={onLoad}>
           Загрузить профиль
@@ -510,8 +705,33 @@ function ProfileCard({
         <button className="primary-button" type="button" onClick={onToggleVisibility}>
           Переключить public/private
         </button>
+        <button className="ghost-button" type="button" onClick={onRefreshPublications}>
+          Мои публикации
+        </button>
       </div>
+      {profile && <CodeBlock value={JSON.stringify(profile, null, 2)} />}
+      <PublicationList publications={publications} />
     </section>
+  );
+}
+
+function PublicationList({ publications, onSave }: { publications: Publication[]; onSave?: (publicationId: string) => void }) {
+  if (publications.length === 0) return <p className="muted-text">Публикаций пока нет.</p>;
+  return (
+    <div className="item-list">
+      {publications.map((publication) => (
+        <div className="item-row" key={publication.id}>
+          <strong>{publication.title || 'Untitled publication'}</strong>
+          <span>{publication.visibility} · {publication.status} · asset {publication.asset_id}</span>
+          <small>{publication.blur_required ? 'blur required' : 'no blur'} · remix {publication.allow_remix ? 'on' : 'off'}</small>
+          {onSave && (
+            <button className="ghost-button small-button" type="button" onClick={() => onSave(publication.id)}>
+              В коллекцию
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -527,15 +747,15 @@ function ProductSection({
   latestTask: GenerationTask | null;
 }) {
   return (
-    <section className="landing-grid">
-      <div className="card hero-card">
-        <p className="eyebrow">{route.path}</p>
-        <h3>{route.title}</h3>
-        <p>{route.description}</p>
+    <section className="card stack-card">
+      <p className="eyebrow">{route.path}</p>
+      <h3>{route.title}</h3>
+      <p>{route.description}</p>
+      <div className="guard-grid">
+        <GuardPill label="Auth" enabled={Boolean(session)} />
+        <GuardPill label="18+ consent" enabled={Boolean(adultConsent?.accepted)} />
+        <GuardPill label="Latest task" enabled={Boolean(latestTask)} />
       </div>
-      <MetricCard label="Auth" value={session ? 'yes' : 'no'} text="Protected routes use Core bearer token." />
-      <MetricCard label="18+" value={adultConsent?.accepted ? 'accepted' : 'required'} text="Feed/Studio gated by adult consent." />
-      <MetricCard label="Latest task" value={latestTask?.status ?? 'none'} text="Generation lifecycle is already wired to Core." />
     </section>
   );
 }
@@ -552,11 +772,11 @@ function SessionPanel({
   return (
     <section className="session-panel">
       <p className="eyebrow">Session</p>
-      <StateRow label="User" value={session?.display_name ?? 'guest'} />
-      <StateRow label="Email" value={session?.email ?? 'not signed in'} />
-      <StateRow label="Adult gate" value={adultConsent?.accepted ? 'accepted' : 'not accepted'} />
+      <GuardPill label="Web token" enabled={Boolean(session)} />
+      <GuardPill label="18+ accepted" enabled={Boolean(adultConsent?.accepted)} />
+      {session && <small>{session.email}</small>}
       {session && (
-        <button className="ghost-button full-width" type="button" onClick={onLogout}>
+        <button className="ghost-button" type="button" onClick={onLogout}>
           Выйти
         </button>
       )}
@@ -566,24 +786,22 @@ function SessionPanel({
 
 function MetricCard({ label, value, text }: { label: string; value: string; text: string }) {
   return (
-    <article className="card metric-card">
+    <div className="card metric-card">
       <p className="eyebrow">{label}</p>
       <strong>{value}</strong>
       <span>{text}</span>
-    </article>
-  );
-}
-
-function StateRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="state-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }
 
+function GuardPill({ label, enabled }: { label: string; enabled: boolean }) {
+  return <span className={enabled ? 'guard-pill enabled' : 'guard-pill'}>{label}</span>;
+}
+
+function CodeBlock({ value }: { value: string }) {
+  return <pre className="code-block">{value}</pre>;
+}
+
 function estimateCredits(mode: GenerationMode, durationSeconds: number): number {
-  if (mode.startsWith('image_')) return 10;
-  return Math.max(1, durationSeconds) * 20;
+  return mode.startsWith('video_') ? durationSeconds * 10 : 25;
 }
