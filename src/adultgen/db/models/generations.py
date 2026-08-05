@@ -1,4 +1,4 @@
-"""Generation task and take models."""
+"""Generation task, callback, and take models."""
 
 from __future__ import annotations
 
@@ -36,6 +36,23 @@ class GenerationTask(Base, CreatedAtMixin):
     error_message: Mapped[str | None] = mapped_column(Text)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class GenerationProviderCallbackRaw(Base, CreatedAtMixin):
+    """Raw provider callback event for generation auditing and dedupe."""
+
+    __tablename__ = "generation_provider_callbacks_raw"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_task_id: Mapped[str | None] = mapped_column(Text)
+    generation_task_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("generation_tasks.id"))
+    status: Mapped[str | None] = mapped_column(Text)
+    raw_payload: Mapped[dict[str, object]] = jsonb_default()
+    result_payload: Mapped[dict[str, object]] = jsonb_default()
+    error_code: Mapped[str | None] = mapped_column(Text)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class SceneTake(Base, CreatedAtMixin):
