@@ -54,6 +54,7 @@ async def publish_media(
             decision=policy_decision,
             surface="publication_submit",
         )
+        await session.commit()
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Publication violates adult content policy.",
