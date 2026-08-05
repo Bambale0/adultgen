@@ -5,7 +5,7 @@ Importing this package loads all model modules so Alembic can see metadata.
 
 from adultgen.db.models.audit import AdminAuditEvent
 from adultgen.db.models.broadcasts import Broadcast, BroadcastRecipient
-from adultgen.db.models.generations import GenerationTask, SceneTake
+from adultgen.db.models.generations import GenerationProviderCallbackRaw, GenerationTask, SceneTake
 from adultgen.db.models.media import MediaAsset, MediaDerivative
 from adultgen.db.models.moderation import ModerationCase
 from adultgen.db.models.notifications import NotificationDelivery
@@ -42,6 +42,7 @@ __all__ = [
     "Broadcast",
     "BroadcastRecipient",
     "FeedEvent",
+    "GenerationProviderCallbackRaw",
     "GenerationTask",
     "MediaAsset",
     "MediaDerivative",
