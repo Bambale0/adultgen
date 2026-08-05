@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { AdminPanel } from './AdminPanel';
 import { App } from './App';
 import './styles.css';
+import './admin.css';
 
 const rootComponent = window.location.pathname === '/admin' ? <AdminPanel /> : <App />;
 
