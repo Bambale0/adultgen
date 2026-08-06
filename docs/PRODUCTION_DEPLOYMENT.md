@@ -4,7 +4,7 @@ This runbook is the production-oriented deployment pack for the web-first AdultG
 
 It runs:
 
-- `nginx` public gateway on `${HTTP_PORT:-80}`;
+- `nginx` public gateway on `${HTTP_PORT:-4444}`;
 - `web` static Vite/React application;
 - `backend` FastAPI Core API;
 - `postgres` durable application database;
@@ -22,10 +22,16 @@ Current intended status:
 
 Requirements on the host:
 
-- Docker Engine with Compose v2;
+- Ubuntu server or another Linux host with Docker Engine and Compose v2;
 - outbound HTTPS access from the host/container network for provider APIs;
-- free local ports for `${HTTP_PORT:-80}` and `${MINIO_CONSOLE_PORT:-9001}`;
+- free local ports for `${HTTP_PORT:-4444}` and `${MINIO_CONSOLE_PORT:-9001}`;
 - enough disk space for Postgres and MinIO volumes.
+
+Port note for Ubuntu:
+
+- `127.0.0.1` without a port means port `80`.
+- This stack defaults to `HTTP_PORT=4444` for local/staging smoke tests to avoid conflicts with host Nginx/Apache/Caddy and privileged-port setup.
+- For real public production behind host-level TLS, set `HTTP_PORT=80` or put Caddy/Nginx/Cloudflare Tunnel in front of `127.0.0.1:4444`.
 
 From repository root, confirm the deployment files exist:
 
@@ -52,11 +58,12 @@ BILLING_BASE_URL=https://your-domain.example
 KIE_CALLBACK_URL=https://your-domain.example/api/webhooks/kie
 ```
 
-For a local smoke/demo run, use localhost values:
+For a local smoke/demo run on Ubuntu, use localhost values with the default demo port:
 
 ```env
-BILLING_BASE_URL=http://127.0.0.1
-KIE_CALLBACK_URL=http://127.0.0.1/api/webhooks/kie
+HTTP_PORT=4444
+BILLING_BASE_URL=http://127.0.0.1:4444
+KIE_CALLBACK_URL=http://127.0.0.1:4444/api/webhooks/kie
 ```
 
 Provider/payment values can be filled with non-placeholder dummy values for a UI-only demo, but real generation/payment callbacks require real approved provider credentials.
@@ -105,8 +112,8 @@ docker compose --env-file .env.production -f docker-compose.production.yml up -d
 ## 4. Verify health
 
 ```bash
-curl -fsS http://127.0.0.1:${HTTP_PORT:-80}/healthz
-curl -fsS http://127.0.0.1:${HTTP_PORT:-80}/api/health
+curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/healthz
+curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/api/health
 ```
 
 Expected responses:
@@ -116,7 +123,7 @@ ok
 {"status":"ok"}
 ```
 
-Or use the helper:
+Or use the helper, which reads `.env.production` and therefore uses `HTTP_PORT=4444` by default:
 
 ```bash
 sh deploy/scripts/healthcheck-production.sh
@@ -129,6 +136,8 @@ docker compose --env-file .env.production -f docker-compose.production.yml ps
 docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=120 backend nginx web postgres redis minio
 ```
 
+If browser shows `ERR_CONNECTION_REFUSED` for `http://127.0.0.1/`, you are opening port `80`. For the default local/staging setup open `http://127.0.0.1:4444/` instead.
+
 ## 5. Access paths
 
 - User web app: `/`
@@ -140,12 +149,12 @@ docker compose --env-file .env.production -f docker-compose.production.yml logs 
 - Gateway health: `/healthz`
 - MinIO console: `127.0.0.1:${MINIO_CONSOLE_PORT:-9001}` by default.
 
-Local URLs with default ports:
+Local URLs with default staging/demo ports:
 
 ```text
-http://127.0.0.1/
-http://127.0.0.1/admin
-http://127.0.0.1/api/health
+http://127.0.0.1:4444/
+http://127.0.0.1:4444/admin
+http://127.0.0.1:4444/api/health
 http://127.0.0.1:9001
 ```
 
@@ -153,13 +162,13 @@ http://127.0.0.1:9001
 
 After bootstrap, check the web product manually:
 
-1. Open `/` and confirm the user app renders.
-2. Open `/admin` and confirm the admin panel renders.
+1. Open `http://127.0.0.1:4444/` and confirm the user app renders.
+2. Open `http://127.0.0.1:4444/admin` and confirm the admin panel renders.
 3. Use the admin token from `.env.production` only in a private/local browser session.
-4. Check `/billing` loads credit packages.
-5. Check `/studio` routes to auth/18+ flow if no session exists.
-6. Check `/api/health` returns `{"status":"ok"}`.
-7. Check MinIO console opens locally and buckets exist.
+4. Check `http://127.0.0.1:4444/billing` loads credit packages.
+5. Check `http://127.0.0.1:4444/studio` routes to auth/18+ flow if no session exists.
+6. Check `http://127.0.0.1:4444/api/health` returns `{"status":"ok"}`.
+7. Check MinIO console opens locally at `http://127.0.0.1:9001` and buckets exist.
 8. Inspect logs for boot errors.
 
 Commands:

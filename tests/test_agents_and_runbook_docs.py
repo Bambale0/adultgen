@@ -36,13 +36,15 @@ def test_production_runbook_has_demo_launch_path() -> None:
 
     assert "AdultGen production deployment runbook" in runbook
     assert "Before you start" in runbook
+    assert "Ubuntu server" in runbook
     assert "One-command bootstrap" in runbook
     assert "Manual smoke checklist" in runbook
     assert "Demo limitations" in runbook
+    assert "HTTP_PORT=4444" in runbook
     assert "sh deploy/scripts/bootstrap-production.sh" in runbook
     assert "sh deploy/scripts/healthcheck-production.sh" in runbook
-    assert "http://127.0.0.1/admin" in runbook
-    assert "http://127.0.0.1/api/health" in runbook
+    assert "http://127.0.0.1:4444/admin" in runbook
+    assert "http://127.0.0.1:4444/api/health" in runbook
 
 
 def test_production_runbook_keeps_honest_blockers_visible() -> None:

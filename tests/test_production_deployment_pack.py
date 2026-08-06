@@ -20,6 +20,7 @@ def test_production_compose_declares_expected_service_graph() -> None:
     assert "OBJECT_STORAGE_BACKEND: s3" in compose
     assert "S3_ENDPOINT_URL: http://minio:9000" in compose
     assert "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001" in compose
+    assert '"${HTTP_PORT:-4444}:80"' in compose
     assert "postgres-data:" in compose
     assert "redis-data:" in compose
     assert "minio-data:" in compose
@@ -65,15 +66,17 @@ def test_production_env_template_and_scripts_guard_secrets() -> None:
 
     assert "change-me" in env_template
     assert "replace-me" in env_template
+    assert "HTTP_PORT=4444" in env_template
     assert "POSTGRES_PASSWORD" in env_template
     assert "MINIO_ROOT_PASSWORD" in env_template
     assert "JWT_SECRET" in env_template
     assert "ADMIN_API_TOKEN" in env_template
-    assert "KIE_CALLBACK_URL=https://example.com/api/webhooks/kie" in env_template
+    assert "KIE_CALLBACK_URL=http://127.0.0.1:4444/api/webhooks/kie" in env_template
     assert "grep -Eiq \"change-me|replace-me\"" in bootstrap
     assert "docker compose --env-file" in bootstrap
     assert "--profile setup run --rm create-buckets" in bootstrap
     assert "--profile migrate run --rm migrate" in bootstrap
+    assert ". \"$ENV_FILE\"" in healthcheck
     assert "$BASE_URL/api/health" in healthcheck
     assert "docker-compose.production.yml" in logs
 
@@ -87,6 +90,7 @@ def test_ci_runs_backend_and_web_builds() -> None:
     assert "web-build:" in ci
     assert "actions/setup-node@v4" in ci
     assert "working-directory: apps/web_app" in ci
+    assert "npm run test" in ci
     assert "npm run build" in ci
 
 
@@ -96,6 +100,7 @@ def test_deployment_runbook_documents_operational_flows() -> None:
     assert "docker compose --env-file .env.production" in runbook
     assert "--profile setup run --rm create-buckets" in runbook
     assert "--profile migrate run --rm migrate" in runbook
-    assert "curl -fsS http://127.0.0.1:${HTTP_PORT:-80}/api/health" in runbook
+    assert "curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/api/health" in runbook
+    assert "http://127.0.0.1:4444/admin" in runbook
     assert "Do not expose `backend`, `postgres`, `redis`, or `minio` ports publicly." in runbook
     assert "For adult content launch" in runbook
