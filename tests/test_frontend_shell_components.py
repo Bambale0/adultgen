@@ -36,7 +36,7 @@ def test_routed_user_app_has_shell_migration_boundary() -> None:
 
     assert "import { AppShell, Sidebar, TopBar } from './components/AppShell';" in routed
     assert "type ShellExtractionStage" in routed
-    assert "SHELL_EXTRACTION_STAGE" in routed
+    assert "getShellExtractionStage" in routed
     assert "ShellContractHarness" in routed
     assert "primaryWebAppRoutes" in routed
     assert "webAppRoutes" in routed
