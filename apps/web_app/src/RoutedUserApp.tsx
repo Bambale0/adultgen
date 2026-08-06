@@ -1,9 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { App } from './App';
+import { createWebSession } from './api';
 import { AppShell, Sidebar, TopBar } from './components/AppShell';
+import { PublicGeneratorLanding } from './components/PublicGeneratorLanding';
 import { useWebRoute } from './hooks/useWebRoute';
 import { primaryWebAppRoutes, webAppRoutes, type WebAppRoute } from './routes';
+import { loadWebSession, saveWebSession } from './session';
 
 type ShellExtractionStage = 'legacy-app-shell-migration' | 'contract-harness';
 
@@ -24,6 +27,10 @@ function routeFromSelect(select: HTMLSelectElement) {
 
 function resolveRoute(routeId: WebAppRoute['id']) {
   return webAppRoutes.find((route) => route.id === routeId) ?? null;
+}
+
+function shouldRenderPublicLanding(activeRoute: WebAppRoute, hasSession: boolean) {
+  return activeRoute.id === 'landing' || (activeRoute.requiresAuth && !hasSession);
 }
 
 function ShellContractHarness({ activeRoute, navigate }: { activeRoute: WebAppRoute; navigate: (route: WebAppRoute) => void }) {
@@ -58,6 +65,8 @@ function ShellContractHarness({ activeRoute, navigate }: { activeRoute: WebAppRo
 
 export function RoutedUserApp() {
   const [activeRoute, navigate] = useWebRoute();
+  const [hasSession, setHasSession] = useState(() => Boolean(loadWebSession()));
+  const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -85,10 +94,48 @@ export function RoutedUserApp() {
     };
   }, [navigate]);
 
+  async function startPublicSession() {
+    const existingSession = loadWebSession();
+    if (existingSession) {
+      setHasSession(true);
+      navigate(resolveRoute('ageGate') ?? resolveRoute('studio') ?? webAppRoutes[0]);
+      return;
+    }
+
+    setIsStarting(true);
+    try {
+      const session = await createWebSession('creator@example.com', 'AdultGen creator');
+      saveWebSession(session);
+      setHasSession(true);
+      navigate(resolveRoute('ageGate') ?? resolveRoute('studio') ?? webAppRoutes[0]);
+    } finally {
+      setIsStarting(false);
+    }
+  }
+
+  function openStudio() {
+    if (!hasSession) {
+      void startPublicSession();
+      return;
+    }
+    navigate(resolveRoute('studio') ?? webAppRoutes[0]);
+  }
+
+  const showPublicLanding = shouldRenderPublicLanding(activeRoute, hasSession);
+
   return (
     <>
       <ShellContractHarness activeRoute={activeRoute} navigate={navigate} />
-      <App key={activeRoute.path} />
+      {showPublicLanding ? (
+        <PublicGeneratorLanding
+          blockedRouteTitle={activeRoute.id === 'landing' ? null : activeRoute.title}
+          isStarting={isStarting}
+          onStart={() => void startPublicSession()}
+          onOpenStudio={openStudio}
+        />
+      ) : (
+        <App key={activeRoute.path} />
+      )}
     </>
   );
 }
