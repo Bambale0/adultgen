@@ -65,7 +65,7 @@ export function PublicGeneratorLanding({
 
         <div className="public-header-actions">
           <button className="public-link-button" type="button" onClick={onOpenStudio}>
-            Создать AI-контент
+            Создать
           </button>
           <button className="public-link-button public-accent-text" type="button">
             Обновление
