@@ -42,6 +42,28 @@ def test_public_generator_landing_uses_reels_feed_product_priority() -> None:
     assert "public-footer" not in landing
 
 
+def test_public_generator_landing_has_functional_reels_interactions() -> None:
+    landing = read("apps/web_app/src/components/PublicGeneratorLanding.tsx")
+    styles = read("apps/web_app/src/components/PublicGeneratorLanding.css")
+
+    assert "createFromItem" in landing
+    assert "openItem" in landing
+    assert "toggleSave" in landing
+    assert "toggleReport" in landing
+    assert "savedTitles" in landing
+    assert "reportedTitles" in landing
+    assert "public-feedback" in landing
+    assert "public-detail-panel" in landing
+    assert "public-detail-head" in landing
+    assert "public-telemetry-grid" in landing
+    assert "AG-NEON-01" in landing
+    assert "Жалоба по" in landing
+    assert ".public-action-rail button.active" in styles
+    assert ".public-detail-panel" in styles
+    assert ".public-telemetry-grid" in styles
+    assert "repeating-linear-gradient" in styles
+
+
 def test_public_generator_landing_keeps_create_flow_visible() -> None:
     landing = read("apps/web_app/src/components/PublicGeneratorLanding.tsx")
 
