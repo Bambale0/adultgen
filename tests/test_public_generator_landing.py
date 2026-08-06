@@ -16,7 +16,9 @@ def test_public_generator_landing_replaces_initial_login_wall() -> None:
     assert "activeRoute.id === 'landing'" in routed_app
     assert "activeRoute.requiresAuth && !hasSession" in routed_app
     assert "Тренды и генерация AI-контента" in landing
-    assert "Сначала показываем продукт" in landing
+    assert "Сначала витрина и превью" in landing
+    assert "public-fold" in landing
+    assert "public-create-panel" in landing
     assert "Вход в сайт-приложение" not in landing
     assert "Войти и получить Core token" not in landing
 

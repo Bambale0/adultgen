@@ -14,8 +14,10 @@ describe('PublicGeneratorLanding', () => {
     expect(screen.getByRole('button', { name: 'AdultGen home' })).toBeTruthy();
     expect(screen.getByPlaceholderText('Поиск AI-контента')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Тренды и генерация AI-контента' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Создать AI-контент' })).toBeTruthy();
+    expect(screen.getByLabelText('Главный экран AdultGen')).toBeTruthy();
     expect(screen.getByLabelText('Примеры AI-превью')).toBeTruthy();
+    expect(screen.getByLabelText('Быстрое создание AI-контента')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Создать AI-контент' })).toBeTruthy();
     expect(screen.queryByText('Вход в сайт-приложение')).toBeNull();
   });
 
