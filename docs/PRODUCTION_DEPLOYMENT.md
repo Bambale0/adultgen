@@ -1,11 +1,12 @@
 # AdultGen production deployment runbook
 
-This runbook is the production-oriented deployment pack for the web-first AdultGen stack.
+This runbook is the production-oriented deployment pack for the current API-only AdultGen stack.
+
+The previous React/Vite frontend has been intentionally removed from the repository. See `docs/FRONTEND_REMOVED.md`.
 
 It runs:
 
-- `nginx` public gateway on `${HTTP_PORT:-4444}`;
-- `web` static Vite/React application;
+- `nginx` public API gateway on `${HTTP_PORT:-4444}`;
 - `backend` FastAPI Core API;
 - `postgres` durable application database;
 - `redis` durable queue/cache state;
@@ -15,8 +16,9 @@ It runs:
 
 Current intended status:
 
-- ready for controlled staging/demo iteration;
-- not ready for full public paid production launch until readiness blockers in `docs/FRONTEND_READINESS_REPORT.md` are closed.
+- backend/API stack is suitable for controlled staging/demo validation;
+- there is no production frontend in this repository;
+- public paid production launch still requires a new approved frontend, provider/payment approval, and end-to-end callback validation.
 
 ## 0. Before you start
 
@@ -51,7 +53,7 @@ chmod 600 .env.production
 
 Fill every `change-me-*` / `replace-me-*` value before starting the stack. The helper script refuses to start while placeholders are still present.
 
-Important public callback URLs should point through the gateway `/api` prefix:
+Public callback URLs should point through the gateway `/api` prefix:
 
 ```env
 BILLING_BASE_URL=https://your-domain.example
@@ -66,7 +68,7 @@ BILLING_BASE_URL=http://127.0.0.1:4444
 KIE_CALLBACK_URL=http://127.0.0.1:4444/api/webhooks/kie
 ```
 
-Provider/payment values can be filled with non-placeholder dummy values for a UI-only demo, but real generation/payment callbacks require real approved provider credentials.
+Provider/payment values can be filled with non-placeholder dummy values for an API-only smoke run. Real generation/payment callbacks require real approved provider credentials.
 
 ## 2. One-command bootstrap
 
@@ -75,7 +77,7 @@ sh deploy/scripts/bootstrap-production.sh
 sh deploy/scripts/healthcheck-production.sh
 ```
 
-This builds images, starts infrastructure, creates buckets, runs migrations, starts the app tier, and verifies public health.
+This builds the backend image, starts infrastructure, creates buckets, runs migrations, starts the API tier, and verifies gateway/API health.
 
 ## 3. Manual launch sequence
 
@@ -103,10 +105,10 @@ Run migrations:
 docker compose --env-file .env.production -f docker-compose.production.yml --profile migrate run --rm migrate
 ```
 
-Start application tier:
+Start API tier:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
+docker compose --env-file .env.production -f docker-compose.production.yml up -d backend nginx
 ```
 
 ## 4. Verify health
@@ -114,159 +116,64 @@ docker compose --env-file .env.production -f docker-compose.production.yml up -d
 ```bash
 curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/healthz
 curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/api/health
+curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/
 ```
 
 Expected responses:
 
-```text
-ok
-{"status":"ok"}
-```
-
-Or use the helper, which reads `.env.production` and therefore uses `HTTP_PORT=4444` by default:
-
-```bash
-sh deploy/scripts/healthcheck-production.sh
-```
-
-If the check fails, inspect service status:
-
-```bash
-docker compose --env-file .env.production -f docker-compose.production.yml ps
-docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=120 backend nginx web postgres redis minio
-```
-
-If browser shows `ERR_CONNECTION_REFUSED` for `http://127.0.0.1/`, you are opening port `80`. For the default local/staging setup open `http://127.0.0.1:4444/` instead.
+- `/healthz` -> `ok`
+- `/api/health` -> backend health response
+- `/` -> plain text notice that the frontend has been removed
 
 ## 5. Access paths
 
-- User web app: `/`
-- Admin web panel: `/admin`
-- Core API through gateway: `/api/*`
-- API health: `/api/health`
-- Kie webhook: `/api/webhooks/kie`
-- CrocoPay webhook: `/api/webhooks/payments/crocopay`
-- Gateway health: `/healthz`
-- MinIO console: `127.0.0.1:${MINIO_CONSOLE_PORT:-9001}` by default.
+Current public gateway paths:
 
-Local URLs with default staging/demo ports:
+- `http://SERVER_IP:4444/healthz`
+- `http://SERVER_IP:4444/api/health`
+- `http://SERVER_IP:4444/api/*`
 
-```text
-http://127.0.0.1:4444/
-http://127.0.0.1:4444/admin
-http://127.0.0.1:4444/api/health
-http://127.0.0.1:9001
-```
+MinIO console remains localhost-bound by default:
 
-## 6. Manual smoke checklist
+- `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`
 
-After bootstrap, check the web product manually:
+There is intentionally no web UI route. `/admin` is also unavailable because the previous admin web panel was part of the removed frontend. Use Admin API endpoints under `/api/admin/*` with `ADMIN_API_TOKEN`.
 
-1. Open `http://127.0.0.1:4444/` and confirm the user app renders.
-2. Open `http://127.0.0.1:4444/admin` and confirm the admin panel renders.
-3. Use the admin token from `.env.production` only in a private/local browser session.
-4. Check `http://127.0.0.1:4444/billing` loads credit packages.
-5. Check `http://127.0.0.1:4444/studio` routes to auth/18+ flow if no session exists.
-6. Check `http://127.0.0.1:4444/api/health` returns `{"status":"ok"}`.
-7. Check MinIO console opens locally at `http://127.0.0.1:9001` and buckets exist.
-8. Inspect logs for boot errors.
-
-Commands:
+## 6. Logs
 
 ```bash
-sh deploy/scripts/healthcheck-production.sh
 sh deploy/scripts/tail-production-logs.sh
-sh deploy/scripts/tail-production-logs.sh backend
-sh deploy/scripts/tail-production-logs.sh nginx
 ```
 
-## 7. Demo limitations
+Or manually:
 
-A local UI/demo run can validate:
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml logs -f backend nginx postgres redis minio
+```
 
-- web shell;
-- admin shell;
-- static frontend build;
-- backend API health;
-- database boot;
-- Redis boot;
-- MinIO boot;
-- gateway routing;
-- migrations;
-- bucket setup.
-
-It does not fully validate real production behavior unless the following are configured and exercised:
-
-- Kie provider credentials and callback delivery;
-- CrocoPay or other approved payment provider credentials and webhook delivery;
-- real S3/MinIO import of generated media;
-- adult-content provider/payment/cloud approval;
-- real blur/thumbnail processor instead of placeholder derivative copy;
-- backup and restore drill.
-
-## 8. Operational rules
-
-- Do not expose `backend`, `postgres`, `redis`, or `minio` ports publicly.
-- Keep public ingress through `nginx` only.
-- Run `create-buckets` after changing bucket names.
-- Run `migrate` before deploying a backend image that changes ORM models or Alembic revisions.
-- Keep `ADMIN_API_TOKEN`, `JWT_SECRET`, provider tokens, and payment secrets outside Git.
-- Use TLS in front of this stack in real production. This Compose file intentionally binds plain HTTP so it can run behind Caddy, Traefik, Cloudflare Tunnel, an L7 load balancer, or host-level certbot/Nginx.
-- For adult content launch, confirm payment/provider/cloud terms in writing before processing real traffic.
-
-## 9. Update existing deployment
-
-Pull latest code, then rebuild and restart:
+## 7. Update flow
 
 ```bash
 git pull origin main
-sh deploy/scripts/bootstrap-production.sh
-sh deploy/scripts/healthcheck-production.sh
-```
-
-For a more controlled update:
-
-```bash
-docker compose --env-file .env.production -f docker-compose.production.yml build backend web nginx
+docker compose --env-file .env.production -f docker-compose.production.yml build backend nginx
 docker compose --env-file .env.production -f docker-compose.production.yml --profile migrate run --rm migrate
-docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
+docker compose --env-file .env.production -f docker-compose.production.yml up -d backend nginx
 sh deploy/scripts/healthcheck-production.sh
 ```
 
-## 10. Rollback shape
+## 8. Backup and restore baseline
 
-For an image-tagged release:
+Back up Postgres and MinIO volumes before destructive changes.
 
-```bash
-ADULTGEN_IMAGE_TAG=previous-tag docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
-```
-
-Database rollbacks are migration-specific. Do not downgrade blindly if a release wrote new data formats.
-
-## 11. Logs
+Minimum Postgres dump:
 
 ```bash
-sh deploy/scripts/tail-production-logs.sh
-sh deploy/scripts/tail-production-logs.sh backend
-sh deploy/scripts/tail-production-logs.sh nginx
+docker compose --env-file .env.production -f docker-compose.production.yml exec postgres \
+  pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > adultgen-postgres.sql
 ```
 
-## 12. Backup targets
+Minimum object-storage backup should copy the MinIO bucket data or use `mc mirror` from a trusted admin host.
 
-At minimum back up:
+## 9. Frontend rebuild rule
 
-- `postgres-data` volume;
-- `minio-data` volume;
-- `.env.production` secret file stored separately in a secure vault.
-
-Redis is append-only in this Compose pack, but application truth should still live in Postgres and object storage.
-
-Suggested first restore drill before public launch:
-
-1. Stop the stack.
-2. Restore Postgres volume from backup.
-3. Restore MinIO volume from backup.
-4. Restore `.env.production` from secure storage.
-5. Start stack.
-6. Run healthcheck.
-7. Open user app/admin panel and verify media/publication records still resolve.
+Do not reintroduce the removed frontend by restoring old files. A new UI must start as a new product/design implementation with its own PR series, tests, and staging review.
