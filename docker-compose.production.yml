@@ -135,30 +135,11 @@ services:
       start_period: 20s
       retries: 3
 
-  web:
-    build:
-      context: .
-      dockerfile: apps/web_app/Dockerfile
-      args:
-        VITE_CORE_API_URL: /api
-    image: adultgen-web:${ADULTGEN_IMAGE_TAG:-local}
-    restart: unless-stopped
-    networks:
-      - public
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
-
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
       backend:
-        condition: service_healthy
-      web:
         condition: service_healthy
     ports:
       - "${HTTP_PORT:-4444}:80"
