@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 describe('PublicGeneratorLanding', () => {
-  it('renders a gallery-first public home instead of an auth wall', () => {
+  it('renders a clean gallery-first public home instead of an auth wall', () => {
     render(<PublicGeneratorLanding onStart={vi.fn()} onOpenStudio={vi.fn()} />);
 
     expect(screen.getByRole('button', { name: 'AdultGen home' })).toBeTruthy();
@@ -18,6 +18,8 @@ describe('PublicGeneratorLanding', () => {
     expect(screen.getByLabelText('Примеры AI-превью')).toBeTruthy();
     expect(screen.getByLabelText('Быстрое создание AI-контента')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Создать AI-контент' })).toBeTruthy();
+    expect(screen.queryByText('AI Photo')).toBeNull();
+    expect(screen.queryByText('AdultGen AI')).toBeNull();
     expect(screen.queryByText('Вход в сайт-приложение')).toBeNull();
   });
 
