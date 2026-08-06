@@ -1,11 +1,10 @@
 # AdultGen production deployment runbook
 
-This runbook is the production-oriented deployment pack for the web-first AdultGen stack.
+This runbook describes the backend-only production baseline.
 
 It runs:
 
 - `nginx` public gateway on `${HTTP_PORT:-4444}`;
-- `web` static Vite/React application;
 - `backend` FastAPI Core API;
 - `postgres` durable application database;
 - `redis` durable queue/cache state;
@@ -13,34 +12,20 @@ It runs:
 - one-shot `create-buckets` setup task;
 - one-shot `migrate` Alembic task.
 
-Current intended status:
+No frontend is currently deployed. The root path intentionally returns `frontend_not_installed`. See `docs/FRONTEND_RESET.md`.
 
-- ready for controlled staging/demo iteration;
-- not ready for full public paid production launch until readiness blockers in `docs/FRONTEND_READINESS_REPORT.md` are closed.
+The backend stack is suitable for controlled staging and integration work. It is not ready for full public paid production launch until provider, payment, safety, media-processing, monitoring, backup, and restore checks are complete.
 
 ## 0. Before you start
 
-Requirements on the host:
+Requirements:
 
-- Ubuntu server or another Linux host with Docker Engine and Compose v2;
-- outbound HTTPS access from the host/container network for provider APIs;
-- free local ports for `${HTTP_PORT:-4444}` and `${MINIO_CONSOLE_PORT:-9001}`;
-- enough disk space for Postgres and MinIO volumes.
+- Ubuntu or another Linux host with Docker Engine and Compose v2;
+- outbound HTTPS access for provider APIs;
+- free ports for `${HTTP_PORT:-4444}` and `${MINIO_CONSOLE_PORT:-9001}`;
+- persistent disk capacity for Postgres and MinIO.
 
-Port note for Ubuntu:
-
-- `127.0.0.1` without a port means port `80`.
-- This stack defaults to `HTTP_PORT=4444` for local/staging smoke tests to avoid conflicts with host Nginx/Apache/Caddy and privileged-port setup.
-- For real public production behind host-level TLS, set `HTTP_PORT=80` or put Caddy/Nginx/Cloudflare Tunnel in front of `127.0.0.1:4444`.
-
-From repository root, confirm the deployment files exist:
-
-```bash
-ls docker-compose.production.yml
-ls deploy/env/production.env.example
-ls deploy/scripts/bootstrap-production.sh
-ls deploy/scripts/healthcheck-production.sh
-```
+The default `HTTP_PORT=4444` avoids conflicts with host-level Nginx, Apache, Caddy, and privileged port setup. Put TLS termination in front of this port for public deployment.
 
 ## 1. Prepare environment
 
@@ -49,24 +34,22 @@ cp deploy/env/production.env.example .env.production
 chmod 600 .env.production
 ```
 
-Fill every `change-me-*` / `replace-me-*` value before starting the stack. The helper script refuses to start while placeholders are still present.
+Replace every `change-me-*` and `replace-me-*` value. The bootstrap helper refuses to start with placeholder secrets.
 
-Important public callback URLs should point through the gateway `/api` prefix:
+Public callback URLs go through the `/api` prefix:
 
 ```env
 BILLING_BASE_URL=https://your-domain.example
 KIE_CALLBACK_URL=https://your-domain.example/api/webhooks/kie
 ```
 
-For a local smoke/demo run on Ubuntu, use localhost values with the default demo port:
+Local smoke values:
 
 ```env
 HTTP_PORT=4444
 BILLING_BASE_URL=http://127.0.0.1:4444
 KIE_CALLBACK_URL=http://127.0.0.1:4444/api/webhooks/kie
 ```
-
-Provider/payment values can be filled with non-placeholder dummy values for a UI-only demo, but real generation/payment callbacks require real approved provider credentials.
 
 ## 2. One-command bootstrap
 
@@ -75,38 +58,16 @@ sh deploy/scripts/bootstrap-production.sh
 sh deploy/scripts/healthcheck-production.sh
 ```
 
-This builds images, starts infrastructure, creates buckets, runs migrations, starts the app tier, and verifies public health.
+The helper builds the backend image, starts infrastructure, creates buckets, runs migrations, starts the backend and gateway, and verifies health.
 
 ## 3. Manual launch sequence
 
-Build images:
-
 ```bash
 docker compose --env-file .env.production -f docker-compose.production.yml build
-```
-
-Start infrastructure:
-
-```bash
 docker compose --env-file .env.production -f docker-compose.production.yml up -d postgres redis minio
-```
-
-Create object-storage buckets:
-
-```bash
 docker compose --env-file .env.production -f docker-compose.production.yml --profile setup run --rm create-buckets
-```
-
-Run migrations:
-
-```bash
 docker compose --env-file .env.production -f docker-compose.production.yml --profile migrate run --rm migrate
-```
-
-Start application tier:
-
-```bash
-docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
+docker compose --env-file .env.production -f docker-compose.production.yml up -d backend nginx
 ```
 
 ## 4. Verify health
@@ -116,107 +77,73 @@ curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/healthz
 curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/api/health
 ```
 
-Expected responses:
+Expected:
 
 ```text
 ok
 {"status":"ok"}
 ```
 
-Or use the helper, which reads `.env.production` and therefore uses `HTTP_PORT=4444` by default:
+The root path should return HTTP 404 with:
 
-```bash
-sh deploy/scripts/healthcheck-production.sh
+```json
+{"detail":"frontend_not_installed"}
 ```
 
-If the check fails, inspect service status:
+Inspect failures with:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.production.yml ps
-docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=120 backend nginx web postgres redis minio
+docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=120 backend nginx postgres redis minio
 ```
 
-If browser shows `ERR_CONNECTION_REFUSED` for `http://127.0.0.1/`, you are opening port `80`. For the default local/staging setup open `http://127.0.0.1:4444/` instead.
+## 5. Public paths
 
-## 5. Access paths
-
-- User web app: `/`
-- Admin web panel: `/admin`
-- Core API through gateway: `/api/*`
+- Gateway health: `/healthz`
+- Core API: `/api/*`
 - API health: `/api/health`
 - Kie webhook: `/api/webhooks/kie`
 - CrocoPay webhook: `/api/webhooks/payments/crocopay`
-- Gateway health: `/healthz`
-- MinIO console: `127.0.0.1:${MINIO_CONSOLE_PORT:-9001}` by default.
+- All non-API web paths: 404 until a replacement frontend is deployed
+- MinIO console: `127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`
 
-Local URLs with default staging/demo ports:
+## 6. Backend smoke checklist
 
-```text
-http://127.0.0.1:4444/
-http://127.0.0.1:4444/admin
-http://127.0.0.1:4444/api/health
-http://127.0.0.1:9001
-```
+1. Run the healthcheck helper.
+2. Confirm `/api/health` returns `{"status":"ok"}`.
+3. Confirm the root path does not serve a stale frontend.
+4. Confirm Postgres, Redis, and MinIO are healthy.
+5. Confirm all required buckets exist.
+6. Exercise Kie and payment callbacks with approved test credentials.
+7. Inspect backend and gateway logs.
+8. Perform a backup and restore drill before public launch.
 
-## 6. Manual smoke checklist
+## 7. Production limitations
 
-After bootstrap, check the web product manually:
-
-1. Open `http://127.0.0.1:4444/` and confirm the user app renders.
-2. Open `http://127.0.0.1:4444/admin` and confirm the admin panel renders.
-3. Use the admin token from `.env.production` only in a private/local browser session.
-4. Check `http://127.0.0.1:4444/billing` loads credit packages.
-5. Check `http://127.0.0.1:4444/studio` routes to auth/18+ flow if no session exists.
-6. Check `http://127.0.0.1:4444/api/health` returns `{"status":"ok"}`.
-7. Check MinIO console opens locally at `http://127.0.0.1:9001` and buckets exist.
-8. Inspect logs for boot errors.
-
-Commands:
-
-```bash
-sh deploy/scripts/healthcheck-production.sh
-sh deploy/scripts/tail-production-logs.sh
-sh deploy/scripts/tail-production-logs.sh backend
-sh deploy/scripts/tail-production-logs.sh nginx
-```
-
-## 7. Demo limitations
-
-A local UI/demo run can validate:
-
-- web shell;
-- admin shell;
-- static frontend build;
-- backend API health;
-- database boot;
-- Redis boot;
-- MinIO boot;
-- gateway routing;
-- migrations;
-- bucket setup.
-
-It does not fully validate real production behavior unless the following are configured and exercised:
+Real launch still requires validation of:
 
 - Kie provider credentials and callback delivery;
-- CrocoPay or other approved payment provider credentials and webhook delivery;
-- real S3/MinIO import of generated media;
-- adult-content provider/payment/cloud approval;
-- real blur/thumbnail processor instead of placeholder derivative copy;
-- backup and restore drill.
+- approved payment provider credentials and webhook delivery;
+- adult-category approval from payment, provider, cloud, and distribution partners;
+- real generated-media import and derivative processing;
+- moderation operations and audit trails;
+- metrics, tracing, alerting, and error reporting;
+- backup and restore procedures;
+- a separately approved replacement frontend, if a web client is required.
 
 ## 8. Operational rules
 
-- Do not expose `backend`, `postgres`, `redis`, or `minio` ports publicly.
+- Do not expose `backend`, `postgres`, `redis`, or `minio` publicly.
 - Keep public ingress through `nginx` only.
 - Run `create-buckets` after changing bucket names.
-- Run `migrate` before deploying a backend image that changes ORM models or Alembic revisions.
+- Run `migrate` before deploying backend schema changes.
 - Keep `ADMIN_API_TOKEN`, `JWT_SECRET`, provider tokens, and payment secrets outside Git.
-- Use TLS in front of this stack in real production. This Compose file intentionally binds plain HTTP so it can run behind Caddy, Traefik, Cloudflare Tunnel, an L7 load balancer, or host-level certbot/Nginx.
-- For adult content launch, confirm payment/provider/cloud terms in writing before processing real traffic.
+- Use TLS in front of the gateway in production.
+- Confirm payment/provider/cloud terms in writing before processing adult traffic.
 
-## 9. Update existing deployment
+## 9. Update and rollback
 
-Pull latest code, then rebuild and restart:
+Update:
 
 ```bash
 git pull origin main
@@ -224,49 +151,28 @@ sh deploy/scripts/bootstrap-production.sh
 sh deploy/scripts/healthcheck-production.sh
 ```
 
-For a more controlled update:
+Controlled restart:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.production.yml build backend web nginx
+docker compose --env-file .env.production -f docker-compose.production.yml build backend
 docker compose --env-file .env.production -f docker-compose.production.yml --profile migrate run --rm migrate
-docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
-sh deploy/scripts/healthcheck-production.sh
+docker compose --env-file .env.production -f docker-compose.production.yml up -d backend nginx
 ```
 
-## 10. Rollback shape
-
-For an image-tagged release:
+Image-tag rollback:
 
 ```bash
-ADULTGEN_IMAGE_TAG=previous-tag docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
+ADULTGEN_IMAGE_TAG=previous-tag docker compose --env-file .env.production -f docker-compose.production.yml up -d backend nginx
 ```
 
-Database rollbacks are migration-specific. Do not downgrade blindly if a release wrote new data formats.
+Database rollbacks are migration-specific. Do not downgrade blindly after new data formats have been written.
 
-## 11. Logs
+## 10. Backup targets
 
-```bash
-sh deploy/scripts/tail-production-logs.sh
-sh deploy/scripts/tail-production-logs.sh backend
-sh deploy/scripts/tail-production-logs.sh nginx
-```
-
-## 12. Backup targets
-
-At minimum back up:
+Back up:
 
 - `postgres-data` volume;
 - `minio-data` volume;
-- `.env.production` secret file stored separately in a secure vault.
+- `.env.production` in a separate secure vault.
 
-Redis is append-only in this Compose pack, but application truth should still live in Postgres and object storage.
-
-Suggested first restore drill before public launch:
-
-1. Stop the stack.
-2. Restore Postgres volume from backup.
-3. Restore MinIO volume from backup.
-4. Restore `.env.production` from secure storage.
-5. Start stack.
-6. Run healthcheck.
-7. Open user app/admin panel and verify media/publication records still resolve.
+Redis is append-only in this pack, but application truth should remain in Postgres and object storage.

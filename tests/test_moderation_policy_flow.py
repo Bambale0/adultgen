@@ -82,15 +82,3 @@ def test_moderation_service_prioritizes_and_hides_publications() -> None:
     assert '"hide_publication"' in service
     assert "PublicationStatus.HIDDEN.value" in service
     assert "list_open_moderation_cases" in service
-
-
-def test_web_client_exposes_report_and_admin_moderation_methods() -> None:
-    api = read("apps/web_app/src/api.ts")
-
-    assert "type ModerationCase" in api
-    assert "reportPublication" in api
-    assert "fetchAdminModerationCases" in api
-    assert "resolveAdminModerationCase" in api
-    assert "`/publications/${publicationId}/reports`" in api
-    assert "'/admin/moderation/cases?limit=" not in api
-    assert "`/admin/moderation/cases?limit=${limit}`" in api

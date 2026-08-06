@@ -1,29 +1,29 @@
 # AdultGen agent operating guide
 
-This repository is a web-first adult AI media platform. Telegram is a companion channel, not the primary product surface.
+This repository is a backend-first adult AI media platform. Telegram bots and future web clients are replaceable channels around the Core API.
 
 Use this file as the operating contract for Codex-style agents, AI assistants, and human developers working in this repo.
 
 ## Current product shape
 
 - Core API: FastAPI backend under `src/adultgen`.
-- Web app: Vite/React frontend under `apps/web_app`.
-- Admin panel: standalone `/admin` frontend entry using `ADMIN_API_TOKEN`.
+- Telegram gateway: backend channel integration under `src/adultgen/telegram_gateway`.
 - Storage: local development adapter and S3-compatible production adapter.
 - Production pack: `docker-compose.production.yml`, `deploy/`, and `docs/PRODUCTION_DEPLOYMENT.md`.
+- Frontend: intentionally absent after the 2026-08-07 reset. See `docs/FRONTEND_RESET.md`.
 
 ## Hard rules
 
-1. Keep changes small and PR-based.
+1. Keep changes focused and PR-based.
 2. Do not push risky rewrites directly into `main`.
 3. Do not claim production readiness unless CI is green and blockers are explicitly closed.
 4. Do not introduce a second wallet balance. Credits must flow through append-only wallet ledger entries.
 5. Do not bypass adult-safety policy checks.
 6. Do not implement adult payment/provider workarounds. Payment/provider/cloud usage must follow written approval and terms.
 7. Do not store secrets in the repository.
-8. Do not expose backend, Postgres, Redis, or MinIO publicly. Public ingress goes through Nginx.
-9. Prefer source-level smoke tests for architectural contracts when full integration tests are not yet available.
-10. If a PR changes runtime behavior, update the relevant runbook or readiness doc.
+8. Do not expose the backend, Postgres, Redis, or MinIO publicly. Public ingress goes through Nginx.
+9. Do not restore, copy, or selectively resurrect code from the removed `apps/mini_app` or `apps/web_app` implementations.
+10. A new frontend requires an approved product brief, route map, state model, API-client boundary, design system, responsive specification, accessibility baseline, and acceptance tests before implementation.
 
 ## Required checks before merge
 
@@ -32,77 +32,51 @@ Every PR should pass:
 ```bash
 ruff check .
 pytest
-cd apps/web_app && npm run typecheck && npm run lint && npm run build
 ```
 
-GitHub Actions already runs these gates. A PR should stay draft until they pass.
+A future frontend must introduce its own lint, typecheck, unit-test, build, and end-to-end gates in the same PR that adds the client scaffold.
 
 ## Branch and PR workflow
 
 1. Create a focused branch from `main`.
 2. Make one logical change.
 3. Add or update tests.
-4. Open draft PR.
+4. Open a draft PR.
 5. Wait for CI.
-6. Fix Ruff/Pytest/typecheck/build failures.
+6. Fix failures.
 7. Mark ready only after green CI.
 8. Merge to `main`.
 
-Preferred PR order for frontend hardening:
+## Frontend reset contract
 
-1. Replace inline `App.tsx` shell with `AppShell`, `Sidebar`, `TopBar`.
-2. Extract `Studio` feature module.
-3. Extract `Billing` feature module.
-4. Extract `Feed/Profile/Collection` feature modules.
-5. Add shared UI primitives.
-6. Add Vitest/React Testing Library.
-7. Add Playwright smoke E2E.
-8. Improve safety UX and report flows.
-9. Add frontend observability hooks.
-10. Run staging checklist.
+The current absence of frontend code is intentional, not an unfinished deletion.
 
-## Launch workflow for local staging/demo
+Before a replacement frontend is created:
 
-Use the production-like Compose pack from the repository root:
+1. Confirm the primary product surface: Telegram Mini App, public web app, admin app, or a deliberate combination.
+2. Freeze the route and user-flow map.
+3. Define authentication, 18+ consent, moderation, billing, upload, generation, publication, and delivery states.
+4. Create a small design system and reusable application shell before feature pages.
+5. Use typed API adapters generated from or checked against backend contracts.
+6. Ship one coherent client implementation, not parallel competing versions.
+7. Add visual regression and critical-path E2E tests before calling it production-ready.
+
+## Launch workflow for backend staging
 
 ```bash
 cp deploy/env/production.env.example .env.production
 chmod 600 .env.production
-```
-
-Edit `.env.production` and replace all `change-me` / `replace-me` values.
-
-Then run:
-
-```bash
 sh deploy/scripts/bootstrap-production.sh
 sh deploy/scripts/healthcheck-production.sh
 ```
 
-Open:
+Endpoints:
 
-- user app: `http://127.0.0.1/`
-- admin panel: `http://127.0.0.1/admin`
-- API health: `http://127.0.0.1/api/health`
+- gateway health: `http://127.0.0.1:${HTTP_PORT:-4444}/healthz`
+- Core API health: `http://127.0.0.1:${HTTP_PORT:-4444}/api/health`
 - MinIO console: `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`
 
-## Readiness status
-
-The latest frontend readiness report lives at:
-
-- `docs/FRONTEND_READINESS_REPORT.md`
-
-Current expected status:
-
-- ready for controlled staging/demo iteration;
-- not ready for full public paid production launch until blockers are closed.
-
-Important blockers to keep visible:
-
-- real blur/thumbnail processing is still not production-grade;
-- provider/payment written adult-category approval is required before real paid traffic;
-- frontend still needs feature extraction, UI test coverage, and E2E smoke tests;
-- staging must validate webhooks, payment callbacks, media delivery, admin actions, backup/restore.
+The root web path intentionally returns `frontend_not_installed` until a new frontend is approved and deployed.
 
 ## Safety and compliance boundaries
 
@@ -120,10 +94,9 @@ Do not weaken policy checks for demo convenience.
 
 Update these docs when relevant:
 
-- `AGENTS.md` — contributor/agent operating rules;
-- `docs/PRODUCTION_DEPLOYMENT.md` — runbook for running the stack;
-- `docs/FRONTEND_AUDIT_ROADMAP.md` — frontend improvement plan;
-- `docs/FRONTEND_READINESS_REPORT.md` — honest readiness status;
+- `AGENTS.md` — contributor and agent operating rules;
+- `docs/PRODUCTION_DEPLOYMENT.md` — backend deployment runbook;
+- `docs/FRONTEND_RESET.md` — frontend baseline and re-entry criteria;
 - `.env.example` / `deploy/env/production.env.example` — runtime configuration templates.
 
 ## Definition of done
@@ -132,7 +105,7 @@ A task is done only when:
 
 - code is merged into `main`;
 - CI is green;
-- docs are updated if runtime/product behavior changed;
+- docs are updated if runtime or product behavior changed;
 - remaining limitations are explicitly called out;
 - no secrets are committed;
-- no safety/payment/provider policy has been bypassed.
+- no safety, payment, or provider policy has been bypassed.

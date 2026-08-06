@@ -2,15 +2,18 @@
 
 This directory is the English documentation entrypoint.
 
+AdultGen currently has no production frontend. The previous Mini App and web implementations were removed; the decision and replacement entry criteria are documented in [`../FRONTEND_RESET.md`](../FRONTEND_RESET.md).
+
 The canonical English architecture documents currently live in the root `docs/` directory:
 
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — platform architecture, runtime applications, bot mirrors, generation, billing, feed, and admin boundaries.
 - [`../MODEL_CAPABILITIES.md`](../MODEL_CAPABILITIES.md) — Kie/Seedream/Seedance model capabilities, payload modes, mutual exclusions, reference mapping, and validation rules.
 - [`../DATA_MODEL.md`](../DATA_MODEL.md) — PostgreSQL schema draft for users, wallets, payments, projects, scenes, media, publications, partner payouts, broadcasts, and audit.
-- [`../API_CONTRACTS.md`](../API_CONTRACTS.md) — first REST API contract draft for Mini App, generation, billing, feed, partner cabinet, admin, and Telegram gateway.
+- [`../API_CONTRACTS.md`](../API_CONTRACTS.md) — REST API contract draft for future clients, generation, billing, feed, partner cabinet, admin, and Telegram gateway.
 - [`../OPERATIONAL_FLOWS.md`](../OPERATIONAL_FLOWS.md) — onboarding, generation, provider callbacks, payments, publication, remix, broadcast, partner payout, and mirror failover flows.
 - [`../SAFETY_COMPLIANCE.md`](../SAFETY_COMPLIANCE.md) — adult-content gate, moderation controls, immutable webhook logging, and high-risk operational constraints.
 - [`../ROADMAP.md`](../ROADMAP.md) — phased implementation plan.
+- [`../FRONTEND_RESET.md`](../FRONTEND_RESET.md) — accepted removal decision and requirements for a replacement frontend.
 
 Russian documentation is available in [`../ru/`](../ru/README.md).
 

@@ -24,7 +24,7 @@ def test_subscription_models_are_registered() -> None:
 
     assert "class UserSubscription" in models
     assert "class SubscriptionCreditGrant" in models
-    assert "UniqueConstraint(\"subscription_id\", \"period_start\", \"period_end\")" in models
+    assert 'UniqueConstraint("subscription_id", "period_start", "period_end")' in models
     assert "UserSubscription" in registry
     assert "SubscriptionCreditGrant" in registry
 
@@ -50,16 +50,3 @@ def test_subscription_router_is_registered_and_exposes_lifecycle() -> None:
     assert '@router.get("/me"' in router
     assert '@router.post("/activate"' in router
     assert '@router.post("/me/cancel-at-period-end"' in router
-
-
-def test_web_subscription_client_calls_core_api() -> None:
-    client = read("apps/web_app/src/subscriptions.ts")
-
-    assert "fetchSubscriptionPlans" in client
-    assert "fetchMySubscription" in client
-    assert "activateSubscription" in client
-    assert "cancelSubscriptionAtPeriodEnd" in client
-    assert "'/subscriptions/plans'" in client
-    assert "'/subscriptions/me'" in client
-    assert "'/subscriptions/activate'" in client
-    assert "'/subscriptions/me/cancel-at-period-end'" in client
