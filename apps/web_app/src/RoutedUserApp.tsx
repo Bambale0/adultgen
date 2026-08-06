@@ -7,7 +7,9 @@ import { primaryWebAppRoutes, webAppRoutes, type WebAppRoute } from './routes';
 
 type ShellExtractionStage = 'legacy-app-shell-migration' | 'contract-harness';
 
-const SHELL_EXTRACTION_STAGE: ShellExtractionStage = 'legacy-app-shell-migration';
+function getShellExtractionStage(): ShellExtractionStage {
+  return 'legacy-app-shell-migration';
+}
 
 function routeFromButton(button: HTMLButtonElement) {
   const title = button.textContent?.trim();
@@ -25,7 +27,7 @@ function resolveRoute(routeId: WebAppRoute['id']) {
 }
 
 function ShellContractHarness({ activeRoute, navigate }: { activeRoute: WebAppRoute; navigate: (route: WebAppRoute) => void }) {
-  const stage: ShellExtractionStage = SHELL_EXTRACTION_STAGE;
+  const stage = getShellExtractionStage();
   if (stage !== 'contract-harness') return null;
 
   return (
