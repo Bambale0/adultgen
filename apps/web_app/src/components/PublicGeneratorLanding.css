@@ -1,6 +1,6 @@
 .public-home {
   min-height: 100vh;
-  padding: 0 40px 46px;
+  padding: 0 40px 24px;
   color: #fff;
   background:
     radial-gradient(circle at 16% -18%, rgba(255, 0, 139, 0.18), transparent 24rem),
@@ -14,38 +14,22 @@
   font: inherit;
 }
 
-.public-category-strip,
 .public-header,
 .public-tabs,
 .public-notice,
-.public-fold,
-.public-footer {
+.public-fold {
   width: min(100%, 1680px);
   margin-inline: auto;
 }
 
-.public-category-strip {
-  display: flex;
-  gap: 26px;
-  min-height: 32px;
-  align-items: center;
-  overflow-x: auto;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-  white-space: nowrap;
-}
-
-.public-category-link,
-.public-link-button,
-.public-footer button {
+.public-link-button {
   border: 0;
   color: rgba(255, 255, 255, 0.92);
   background: transparent;
   font-weight: 750;
 }
 
-.public-category-link:hover,
-.public-link-button:hover,
-.public-footer button:hover {
+.public-link-button:hover {
   color: #ff0a8a;
 }
 
@@ -59,6 +43,7 @@
   align-items: center;
   min-height: 70px;
   padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(5, 5, 7, 0.88);
   backdrop-filter: blur(18px);
 }
@@ -166,7 +151,6 @@
   gap: 28px;
   min-height: 40px;
   align-items: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -206,7 +190,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(330px, 430px);
   gap: 18px;
   align-items: start;
-  padding: 18px 0 56px;
+  padding: 18px 0 24px;
 }
 
 .public-gallery-column {
@@ -446,28 +430,6 @@
   font-size: 13px;
 }
 
-.public-footer {
-  position: fixed;
-  z-index: 9;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  gap: 18px;
-  align-items: center;
-  min-height: 38px;
-  padding: 0 40px;
-  overflow-x: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(5, 5, 7, 0.92);
-  backdrop-filter: blur(16px);
-  white-space: nowrap;
-}
-
-.public-footer strong {
-  color: #fff;
-}
-
 @media (max-width: 1280px) {
   .public-fold {
     grid-template-columns: 1fr;
@@ -512,9 +474,9 @@
     padding-inline: 12px;
   }
 
-  .public-category-strip,
   .public-tabs {
     justify-content: flex-start;
+    overflow-x: auto;
   }
 
   .public-gallery {
@@ -527,9 +489,5 @@
   .public-tile.standard {
     grid-column: auto;
     grid-row: span 1;
-  }
-
-  .public-footer {
-    padding-inline: 12px;
   }
 }

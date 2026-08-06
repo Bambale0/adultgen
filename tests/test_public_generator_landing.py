@@ -23,20 +23,21 @@ def test_public_generator_landing_replaces_initial_login_wall() -> None:
     assert "Войти и получить Core token" not in landing
 
 
-def test_public_generator_landing_uses_gallery_first_product_priority() -> None:
+def test_public_generator_landing_uses_clean_gallery_first_product_priority() -> None:
     landing = read("apps/web_app/src/components/PublicGeneratorLanding.tsx")
     styles = read("apps/web_app/src/components/PublicGeneratorLanding.css")
 
     assert "public-header" in landing
     assert "public-search" in landing
-    assert "public-category-strip" in landing
     assert "public-tabs" in landing
     assert "public-gallery" in landing
-    assert "public-footer" in landing
     assert "previewTiles" in landing
     assert "public-home" in styles
     assert "grid-template-columns: repeat(4" in styles
-    assert "position: fixed" in styles
+    assert "public-category-strip" not in landing
+    assert "public-category-link" not in styles
+    assert "public-footer" not in landing
+    assert "position: fixed" not in styles
 
 
 def test_public_generator_landing_keeps_create_flow_visible() -> None:
