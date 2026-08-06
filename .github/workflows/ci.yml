@@ -57,6 +57,10 @@ jobs:
         working-directory: apps/web_app
         run: npm run lint
 
+      - name: Test web app
+        working-directory: apps/web_app
+        run: npm run test
+
       - name: Build web app
         working-directory: apps/web_app
         env:
