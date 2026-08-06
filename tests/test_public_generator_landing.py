@@ -15,22 +15,37 @@ def test_public_generator_landing_replaces_initial_login_wall() -> None:
     assert "shouldRenderPublicLanding" in routed_app
     assert "activeRoute.id === 'landing'" in routed_app
     assert "activeRoute.requiresAuth && !hasSession" in routed_app
-    assert "Создай AI-контент за один prompt" in landing
-    assert "Сначала показываем продукт и генератор" in landing
+    assert "Тренды и генерация AI-контента" in landing
+    assert "Сначала показываем продукт" in landing
     assert "Вход в сайт-приложение" not in landing
     assert "Войти и получить Core token" not in landing
 
 
-def test_public_generator_landing_keeps_createporn_style_product_priority() -> None:
+def test_public_generator_landing_uses_gallery_first_product_priority() -> None:
+    landing = read("apps/web_app/src/components/PublicGeneratorLanding.tsx")
+    styles = read("apps/web_app/src/components/PublicGeneratorLanding.css")
+
+    assert "public-header" in landing
+    assert "public-search" in landing
+    assert "public-category-strip" in landing
+    assert "public-tabs" in landing
+    assert "public-gallery" in landing
+    assert "public-footer" in landing
+    assert "previewTiles" in landing
+    assert "public-home" in styles
+    assert "grid-template-columns: repeat(4" in styles
+    assert "position: fixed" in styles
+
+
+def test_public_generator_landing_keeps_create_flow_visible() -> None:
     landing = read("apps/web_app/src/components/PublicGeneratorLanding.tsx")
 
-    assert "Prompt" in landing
     assert "Text to image" in landing
     assert "Image to video" in landing
     assert "Reference style" in landing
     assert "Cinematic scene" in landing
-    assert "Private by default" in landing
-    assert "Создать" in landing
+    assert "Создать AI-контент" in landing
+    assert "Настройки Studio" in landing
 
 
 def test_public_generator_landing_starts_session_before_private_app() -> None:
