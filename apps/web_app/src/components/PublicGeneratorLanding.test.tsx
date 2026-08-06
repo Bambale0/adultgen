@@ -8,15 +8,15 @@ afterEach(() => {
 });
 
 describe('PublicGeneratorLanding', () => {
-  it('renders a clean gallery-first public home instead of an auth wall', () => {
+  it('renders a TikTok-style reels feed instead of an auth wall', () => {
     render(<PublicGeneratorLanding onStart={vi.fn()} onOpenStudio={vi.fn()} />);
 
     expect(screen.getByRole('button', { name: 'AdultGen home' })).toBeTruthy();
     expect(screen.getByPlaceholderText('Поиск AI-контента')).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Тренды и генерация AI-контента' })).toBeTruthy();
-    expect(screen.getByLabelText('Главный экран AdultGen')).toBeTruthy();
-    expect(screen.getByLabelText('Примеры AI-превью')).toBeTruthy();
+    expect(screen.getByLabelText('Главная лента AdultGen')).toBeTruthy();
+    expect(screen.getByLabelText('TikTok-style лента AI-превью')).toBeTruthy();
     expect(screen.getByLabelText('Быстрое создание AI-контента')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Neon portrait' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Создать AI-контент' })).toBeTruthy();
     expect(screen.queryByText('AI Photo')).toBeNull();
     expect(screen.queryByText('AdultGen AI')).toBeNull();
@@ -29,6 +29,16 @@ describe('PublicGeneratorLanding', () => {
     expect(screen.getByText(/Раздел “Лента” откроется/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Создать AI-контент' })).toBeTruthy();
     expect(screen.queryByText('Войти и получить Core token')).toBeNull();
+  });
+
+  it('copies a feed item prompt into the compose dock', () => {
+    render(<PublicGeneratorLanding onStart={vi.fn()} onOpenStudio={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Создать в стиле Anime night' }));
+
+    expect(screen.getByLabelText('Описание сцены')).toHaveValue(
+      expect.stringContaining('anime scene, blue moonlight'),
+    );
   });
 
   it('calls start action from the primary CTA', () => {
