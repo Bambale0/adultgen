@@ -7,12 +7,14 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_production_compose_declares_expected_service_graph() -> None:
+def test_production_compose_declares_api_only_service_graph() -> None:
     compose = read("docker-compose.production.yml")
 
-    for service in ("postgres", "redis", "minio", "create-buckets", "migrate", "backend", "web", "nginx"):
+    for service in ("postgres", "redis", "minio", "create-buckets", "migrate", "backend", "nginx"):
         assert f"  {service}:" in compose
 
+    assert "  web:" not in compose
+    assert "apps/web_app" not in compose
     assert "condition: service_healthy" in compose
     assert "profiles: [\"setup\"]" in compose
     assert "profiles: [\"migrate\"]" in compose
@@ -27,9 +29,8 @@ def test_production_compose_declares_expected_service_graph() -> None:
     assert "internal: true" not in compose
 
 
-def test_api_and_web_dockerfiles_are_production_oriented() -> None:
+def test_api_dockerfile_is_production_oriented() -> None:
     api_dockerfile = read("Dockerfile")
-    web_dockerfile = read("apps/web_app/Dockerfile")
 
     assert "python:3.12-slim AS builder" in api_dockerfile
     assert "python:3.12-slim AS runtime" in api_dockerfile
@@ -38,24 +39,18 @@ def test_api_and_web_dockerfiles_are_production_oriented() -> None:
     assert "HEALTHCHECK" in api_dockerfile
     assert "uvicorn" in api_dockerfile
     assert "--proxy-headers" in api_dockerfile
-    assert "node:24-alpine AS build" in web_dockerfile
-    assert "nginx:1.27-alpine AS runtime" in web_dockerfile
-    assert "npm run build" in web_dockerfile
-    assert "VITE_CORE_API_URL=/api" in web_dockerfile
 
 
-def test_nginx_configs_route_api_and_spa() -> None:
+def test_nginx_config_is_api_only() -> None:
     gateway = read("deploy/nginx/gateway.conf")
-    web = read("deploy/nginx/web-app.conf")
 
     assert "location /api/" in gateway
     assert "proxy_pass http://backend:8000/" in gateway
-    assert "proxy_pass http://web:8080" in gateway
+    assert "proxy_pass http://web:8080" not in gateway
+    assert "Frontend removed" in gateway
     assert "client_max_body_size 256m" in gateway
     assert "proxy_set_header X-Forwarded-Proto" in gateway
     assert "location = /healthz" in gateway
-    assert "try_files $uri $uri/ /index.html" in web
-    assert "location /healthz" in web
 
 
 def test_production_env_template_and_scripts_guard_secrets() -> None:
@@ -76,31 +71,33 @@ def test_production_env_template_and_scripts_guard_secrets() -> None:
     assert "docker compose --env-file" in bootstrap
     assert "--profile setup run --rm create-buckets" in bootstrap
     assert "--profile migrate run --rm migrate" in bootstrap
+    assert "up -d backend nginx" in bootstrap
+    assert "up -d backend web nginx" not in bootstrap
     assert ". \"$ENV_FILE\"" in healthcheck
     assert "$BASE_URL/api/health" in healthcheck
     assert "docker-compose.production.yml" in logs
 
 
-def test_ci_runs_backend_and_web_builds() -> None:
+def test_ci_runs_backend_only_after_frontend_removal() -> None:
     ci = read(".github/workflows/ci.yml")
 
     assert "backend-test:" in ci
     assert "ruff check ." in ci
     assert "pytest" in ci
-    assert "web-build:" in ci
-    assert "actions/setup-node@v4" in ci
-    assert "working-directory: apps/web_app" in ci
-    assert "npm run test" in ci
-    assert "npm run build" in ci
+    assert "web-build:" not in ci
+    assert "actions/setup-node@v4" not in ci
+    assert "working-directory: apps/web_app" not in ci
+    assert "npm run build" not in ci
 
 
-def test_deployment_runbook_documents_operational_flows() -> None:
+def test_deployment_runbook_documents_api_only_operational_flows() -> None:
     runbook = read("docs/PRODUCTION_DEPLOYMENT.md")
 
+    assert "API-only" in runbook
+    assert "frontend has been intentionally removed" in runbook
     assert "docker compose --env-file .env.production" in runbook
     assert "--profile setup run --rm create-buckets" in runbook
     assert "--profile migrate run --rm migrate" in runbook
     assert "curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/api/health" in runbook
-    assert "http://127.0.0.1:4444/admin" in runbook
-    assert "Do not expose `backend`, `postgres`, `redis`, or `minio` ports publicly." in runbook
-    assert "For adult content launch" in runbook
+    assert "There is intentionally no web UI route" in runbook
+    assert "Do not reintroduce the removed frontend" in runbook
