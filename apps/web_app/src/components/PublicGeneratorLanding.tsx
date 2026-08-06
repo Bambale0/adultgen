@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+import './PublicGeneratorLanding.css';
+
 type PublicGeneratorLandingProps = {
   blockedRouteTitle?: string | null;
   isStarting?: boolean;
