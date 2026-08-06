@@ -21,7 +21,7 @@ def test_web_api_exposes_billing_client_methods() -> None:
 
 def test_billing_route_renders_real_checkout_flow() -> None:
     app = read("apps/web_app/src/App.tsx")
-    assert "activeRoute.id === 'billing'" in app
+    assert "case 'billing'" in app or "activeRoute.id === 'billing'" in app
     assert "BillingCard" in app
     assert "creditPackages" in app
     assert "selectedPackageCode" in app
@@ -41,7 +41,7 @@ def test_billing_ui_uses_stale_response_cleanup_for_packages() -> None:
 
 
 def test_billing_styles_are_present() -> None:
-    styles = read("apps/web_app/src/styles.css")
+    styles = read("apps/web_app/src/styles.css") + read("apps/web_app/src/ux-polish.css")
     assert ".billing-grid" in styles
     assert ".package-grid" in styles
     assert ".package-card.selected" in styles
