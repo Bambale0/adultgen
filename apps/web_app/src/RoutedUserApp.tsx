@@ -1,8 +1,15 @@
 import { useEffect } from 'react';
 
 import { App } from './App';
+import { AppShell, Sidebar, TopBar } from './components/AppShell';
 import { useWebRoute } from './hooks/useWebRoute';
-import { webAppRoutes } from './routes';
+import { primaryWebAppRoutes, webAppRoutes, type WebAppRoute } from './routes';
+
+type ShellExtractionStage = 'legacy-app-shell-migration' | 'contract-harness';
+
+function getShellExtractionStage(): ShellExtractionStage {
+  return 'legacy-app-shell-migration';
+}
 
 function routeFromButton(button: HTMLButtonElement) {
   const title = button.textContent?.trim();
@@ -13,6 +20,40 @@ function routeFromButton(button: HTMLButtonElement) {
 function routeFromSelect(select: HTMLSelectElement) {
   if (select.getAttribute('aria-label') !== 'Route selector') return null;
   return webAppRoutes.find((route) => route.id === select.value) ?? null;
+}
+
+function resolveRoute(routeId: WebAppRoute['id']) {
+  return webAppRoutes.find((route) => route.id === routeId) ?? null;
+}
+
+function ShellContractHarness({ activeRoute, navigate }: { activeRoute: WebAppRoute; navigate: (route: WebAppRoute) => void }) {
+  const stage = getShellExtractionStage();
+  if (stage !== 'contract-harness') return null;
+
+  return (
+    <AppShell
+      activeRoute={activeRoute}
+      sidebar={
+        <Sidebar
+          activeRoute={activeRoute}
+          routes={primaryWebAppRoutes}
+          onNavigate={navigate}
+          routeResolver={resolveRoute}
+        />
+      }
+      topbar={
+        <TopBar
+          activeRoute={activeRoute}
+          routes={webAppRoutes}
+          statusMessage={null}
+          errorMessage={null}
+          onNavigate={navigate}
+        />
+      }
+    >
+      <span hidden>Shell extraction contract</span>
+    </AppShell>
+  );
 }
 
 export function RoutedUserApp() {
@@ -44,5 +85,10 @@ export function RoutedUserApp() {
     };
   }, [navigate]);
 
-  return <App key={activeRoute.path} />;
+  return (
+    <>
+      <ShellContractHarness activeRoute={activeRoute} navigate={navigate} />
+      <App key={activeRoute.path} />
+    </>
+  );
 }
