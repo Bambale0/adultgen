@@ -54,11 +54,13 @@ def test_public_generator_landing_has_functional_reels_interactions() -> None:
     assert "reportedTitles" in landing
     assert "public-feedback" in landing
     assert "public-detail-panel" in landing
+    assert "public-detail-head" in landing
     assert "public-telemetry-grid" in landing
     assert "AG-NEON-01" in landing
     assert "Жалоба по" in landing
     assert ".public-action-rail button.active" in styles
     assert ".public-detail-panel" in styles
+    assert ".public-telemetry-grid" in styles
     assert "repeating-linear-gradient" in styles
 
 
