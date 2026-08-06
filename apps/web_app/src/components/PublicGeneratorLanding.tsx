@@ -9,19 +9,51 @@ type PublicGeneratorLandingProps = {
   onOpenStudio: () => void;
 };
 
-const contentTabs = ['Изображения', 'Видео', 'GIF'];
+const contentTabs = ['Для вас', 'Изображения', 'Видео', 'GIF'];
 const quickModes = ['Text to image', 'Image to video', 'Reference style', 'Cinematic scene'];
 const privacyModes = ['Private by default', 'Blur previews', '18+ gate'];
 
-const previewTiles = [
-  { title: 'Neon portrait', prompt: 'cinematic neon portrait, soft shadows', tone: 'violet', size: 'wide' },
-  { title: 'Editorial studio', prompt: 'premium editorial studio lighting', tone: 'rose', size: 'tall' },
-  { title: 'Anime night', prompt: 'anime scene, blue moonlight, detailed frame', tone: 'blue', size: 'tall' },
-  { title: 'Private concept', prompt: 'private character concept, controlled pose', tone: 'amber', size: 'wide' },
-  { title: 'Reference style', prompt: 'style transfer from reference image', tone: 'green', size: 'standard' },
-  { title: 'Video frame', prompt: 'first frame to short cinematic video', tone: 'cyan', size: 'standard' },
-  { title: 'Studio setup', prompt: 'saved characters, prompt presets, draft scenes', tone: 'slate', size: 'standard' },
-  { title: 'Creator feed', prompt: 'published previews with report and save actions', tone: 'magenta', size: 'wide' },
+const feedItems = [
+  {
+    title: 'Neon portrait',
+    prompt: 'cinematic neon portrait, soft shadows, premium lighting',
+    creator: '@adultgen.studio',
+    tone: 'violet',
+    mode: 'Text to image',
+    stats: '18.4K',
+  },
+  {
+    title: 'Editorial studio',
+    prompt: 'premium editorial studio lighting, controlled composition',
+    creator: '@creator.lab',
+    tone: 'rose',
+    mode: 'Reference style',
+    stats: '12.8K',
+  },
+  {
+    title: 'Anime night',
+    prompt: 'anime scene, blue moonlight, detailed frame, cinematic camera',
+    creator: '@animeflow',
+    tone: 'blue',
+    mode: 'Image to video',
+    stats: '9.6K',
+  },
+  {
+    title: 'Private concept',
+    prompt: 'private character concept, controlled pose, soft cinematic light',
+    creator: '@private.render',
+    tone: 'amber',
+    mode: 'Cinematic scene',
+    stats: '7.1K',
+  },
+  {
+    title: 'Creator feed',
+    prompt: 'published previews with save, report, remix and privacy controls',
+    creator: '@feed.ops',
+    tone: 'magenta',
+    mode: 'Gallery preview',
+    stats: '6.3K',
+  },
 ];
 
 const defaultPrompt =
@@ -38,8 +70,8 @@ export function PublicGeneratorLanding({
   const [selectedTab, setSelectedTab] = useState(contentTabs[0]);
 
   return (
-    <main className="public-home">
-      <header className="public-header">
+    <main className="public-home public-reels-home">
+      <header className="public-reels-header">
         <button className="public-brand" type="button" onClick={onOpenStudio} aria-label="AdultGen home">
           <span className="public-brand-mark">∞</span>
           <strong>AdultGen</strong>
@@ -53,16 +85,22 @@ export function PublicGeneratorLanding({
           </button>
         </label>
 
-        <button className="public-outline-button" type="button">
-          Категории
-        </button>
+        <nav className="public-tabs" aria-label="Тип контента">
+          {contentTabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={tab === selectedTab ? 'public-tab active' : 'public-tab'}
+              onClick={() => setSelectedTab(tab)}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
 
         <div className="public-header-actions">
           <button className="public-link-button" type="button" onClick={onOpenStudio}>
             Создать
-          </button>
-          <button className="public-link-button public-accent-text" type="button">
-            Обновление
           </button>
           <button className="public-login-button" type="button" onClick={onOpenStudio}>
             Войти
@@ -70,78 +108,65 @@ export function PublicGeneratorLanding({
         </div>
       </header>
 
-      <section className="public-tabs" aria-label="Тип контента">
-        {contentTabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            className={tab === selectedTab ? 'public-tab active' : 'public-tab'}
-            onClick={() => setSelectedTab(tab)}
-          >
-            {tab}
-          </button>
-        ))}
-      </section>
-
       {blockedRouteTitle && (
         <section className="public-notice" aria-live="polite">
-          Раздел “{blockedRouteTitle}” откроется после старта сессии и подтверждения 18+. Пока можно выбрать стиль и описать сцену.
+          Раздел “{blockedRouteTitle}” откроется после старта сессии и подтверждения 18+. Пока можно смотреть ленту и описать сцену.
         </section>
       )}
 
-      <section className="public-fold" aria-label="Главный экран AdultGen">
-        <div className="public-gallery-column">
-          <div className="public-feed-toolbar">
-            <div>
-              <p className="eyebrow">AI adult media generator</p>
-              <h1>Тренды и генерация AI-контента</h1>
-              <p className="public-subtitle">
-                Сначала витрина и превью. Создание, вход и 18+ включаются только по действию пользователя.
-              </p>
-            </div>
-            <div className="public-hero-actions">
-              <button className="public-filter-button" type="button">
-                Фильтры
-              </button>
-              <button className="public-compact-action" type="button">
-                Слайды
-              </button>
-              <button className="public-compact-action" type="button">
-                Развернуть
-              </button>
-            </div>
-          </div>
+      <section className="public-reels-stage" aria-label="Главная лента AdultGen">
+        <section className="public-reels-scroll" aria-label="TikTok-style лента AI-превью">
+          {feedItems.map((item, index) => (
+            <article key={item.title} className={`public-reel-card ${item.tone}`}>
+              <div className="public-reel-media" aria-hidden="true">
+                <span className="public-reel-index">{String(index + 1).padStart(2, '0')}</span>
+                <span className="public-reel-play">▶</span>
+              </div>
 
-          <section className="public-gallery" aria-label="Примеры AI-превью">
-            {previewTiles.map((tile, index) => (
-              <article key={tile.title} className={`public-tile ${tile.tone} ${tile.size}`}>
-                <div className="public-tile-art" aria-hidden="true">
-                  <span>{String(index + 1).padStart(2, '0')}</span>
+              <div className="public-reel-overlay">
+                <div className="public-reel-badges">
+                  <span>{item.mode}</span>
+                  <span>Private preview</span>
                 </div>
-                <footer>
-                  <strong>{tile.title}</strong>
-                  <small>{tile.prompt}</small>
-                  <button type="button" aria-label={`Открыть ${tile.title}`}>
-                    ◉
-                  </button>
-                </footer>
-              </article>
-            ))}
-          </section>
-        </div>
+                <h1>{item.title}</h1>
+                <p>{item.prompt}</p>
+                <strong>{item.creator}</strong>
+              </div>
 
-        <aside className="public-create-panel" aria-label="Быстрое создание AI-контента">
-          <div className="public-create-head">
+              <aside className="public-action-rail" aria-label={`Действия для ${item.title}`}>
+                <button type="button" aria-label={`Создать в стиле ${item.title}`} onClick={() => setPrompt(item.prompt)}>
+                  ✦
+                  <small>Создать</small>
+                </button>
+                <button type="button" aria-label={`Сохранить ${item.title}`}>
+                  ♡
+                  <small>{item.stats}</small>
+                </button>
+                <button type="button" aria-label={`Открыть ${item.title}`}>
+                  ↗
+                  <small>Открыть</small>
+                </button>
+                <button type="button" aria-label={`Пожаловаться на ${item.title}`}>
+                  ⚑
+                  <small>Report</small>
+                </button>
+              </aside>
+            </article>
+          ))}
+        </section>
+
+        <aside className="public-compose-dock" aria-label="Быстрое создание AI-контента">
+          <div className="public-compose-head">
             <div>
               <p className="eyebrow">Prompt</p>
-              <h2>Что создаём?</h2>
+              <h2>Создать из ленты</h2>
             </div>
             <span>{selectedMode}</span>
           </div>
 
           <textarea
             aria-label="Описание сцены"
-            rows={5}
+            rows={4}
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
             placeholder="Опиши сцену, стиль, ракурс, свет, настроение…"
@@ -171,12 +196,12 @@ export function PublicGeneratorLanding({
               {isStarting ? 'Запускаем…' : 'Создать AI-контент'}
             </button>
             <button className="public-outline-button" type="button" onClick={onOpenStudio}>
-              Настройки Studio
+              Studio
             </button>
           </div>
 
           <p className="public-create-note">
-            Генерация откроет сессию, затем покажет 18+ policy gate. До этого главная остаётся публичной витриной.
+            Главная — лента превью. Создание откроет сессию и 18+ policy gate только после действия пользователя.
           </p>
         </aside>
       </section>

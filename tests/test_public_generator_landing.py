@@ -15,29 +15,31 @@ def test_public_generator_landing_replaces_initial_login_wall() -> None:
     assert "shouldRenderPublicLanding" in routed_app
     assert "activeRoute.id === 'landing'" in routed_app
     assert "activeRoute.requiresAuth && !hasSession" in routed_app
-    assert "Тренды и генерация AI-контента" in landing
-    assert "Сначала витрина и превью" in landing
-    assert "public-fold" in landing
-    assert "public-create-panel" in landing
+    assert "TikTok-style лента AI-превью" in landing
+    assert "public-reels-stage" in landing
+    assert "public-compose-dock" in landing
     assert "Вход в сайт-приложение" not in landing
     assert "Войти и получить Core token" not in landing
 
 
-def test_public_generator_landing_uses_clean_gallery_first_product_priority() -> None:
+def test_public_generator_landing_uses_reels_feed_product_priority() -> None:
     landing = read("apps/web_app/src/components/PublicGeneratorLanding.tsx")
     styles = read("apps/web_app/src/components/PublicGeneratorLanding.css")
 
-    assert "public-header" in landing
+    assert "public-reels-header" in landing
     assert "public-search" in landing
     assert "public-tabs" in landing
-    assert "public-gallery" in landing
-    assert "previewTiles" in landing
-    assert "public-home" in styles
-    assert "grid-template-columns: repeat(4" in styles
+    assert "public-reels-scroll" in landing
+    assert "public-reel-card" in landing
+    assert "public-action-rail" in landing
+    assert "feedItems" in landing
+    assert "scroll-snap-type: y mandatory" in styles
+    assert "scroll-snap-align: start" in styles
+    assert "height: 100vh" in styles
+    assert "public-gallery" not in landing
     assert "public-category-strip" not in landing
     assert "public-category-link" not in styles
     assert "public-footer" not in landing
-    assert "position: fixed" not in styles
 
 
 def test_public_generator_landing_keeps_create_flow_visible() -> None:
@@ -48,7 +50,7 @@ def test_public_generator_landing_keeps_create_flow_visible() -> None:
     assert "Reference style" in landing
     assert "Cinematic scene" in landing
     assert "Создать AI-контент" in landing
-    assert "Настройки Studio" in landing
+    assert "Studio" in landing
 
 
 def test_public_generator_landing_starts_session_before_private_app() -> None:
