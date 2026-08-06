@@ -1,16 +1,16 @@
 # AdultGen agent operating guide
 
-This repository is a web-first adult AI media platform. Telegram is a companion channel, not the primary product surface.
+This repository is currently an API-first adult AI media platform backend. The previous web frontend was intentionally removed because it was not acceptable as a product UI.
 
 Use this file as the operating contract for Codex-style agents, AI assistants, and human developers working in this repo.
 
 ## Current product shape
 
 - Core API: FastAPI backend under `src/adultgen`.
-- Web app: Vite/React frontend under `apps/web_app`.
-- Admin panel: standalone `/admin` frontend entry using `ADMIN_API_TOKEN`.
+- Admin API: backend endpoints protected by `ADMIN_API_TOKEN`.
+- Web frontend: intentionally removed. See `docs/FRONTEND_REMOVED.md`.
 - Storage: local development adapter and S3-compatible production adapter.
-- Production pack: `docker-compose.production.yml`, `deploy/`, and `docs/PRODUCTION_DEPLOYMENT.md`.
+- Production pack: API-only `docker-compose.production.yml`, `deploy/`, and `docs/PRODUCTION_DEPLOYMENT.md`.
 
 ## Hard rules
 
@@ -23,7 +23,8 @@ Use this file as the operating contract for Codex-style agents, AI assistants, a
 7. Do not store secrets in the repository.
 8. Do not expose backend, Postgres, Redis, or MinIO publicly. Public ingress goes through Nginx.
 9. Prefer source-level smoke tests for architectural contracts when full integration tests are not yet available.
-10. If a PR changes runtime behavior, update the relevant runbook or readiness doc.
+10. If a PR changes runtime behavior, update the relevant runbook or status doc.
+11. Do not restore the removed frontend or copy it back. A future UI must start as a new implementation from an approved product brief.
 
 ## Required checks before merge
 
@@ -32,10 +33,9 @@ Every PR should pass:
 ```bash
 ruff check .
 pytest
-cd apps/web_app && npm run typecheck && npm run lint && npm run build
 ```
 
-GitHub Actions already runs these gates. A PR should stay draft until they pass.
+GitHub Actions runs these backend gates. A PR should stay draft until they pass.
 
 ## Branch and PR workflow
 
@@ -44,22 +44,21 @@ GitHub Actions already runs these gates. A PR should stay draft until they pass.
 3. Add or update tests.
 4. Open draft PR.
 5. Wait for CI.
-6. Fix Ruff/Pytest/typecheck/build failures.
+6. Fix Ruff/Pytest failures.
 7. Mark ready only after green CI.
 8. Merge to `main`.
 
-Preferred PR order for frontend hardening:
+## Future frontend rebuild rule
 
-1. Replace inline `App.tsx` shell with `AppShell`, `Sidebar`, `TopBar`.
-2. Extract `Studio` feature module.
-3. Extract `Billing` feature module.
-4. Extract `Feed/Profile/Collection` feature modules.
-5. Add shared UI primitives.
-6. Add Vitest/React Testing Library.
-7. Add Playwright smoke E2E.
-8. Improve safety UX and report flows.
-9. Add frontend observability hooks.
-10. Run staging checklist.
+The old frontend is not a base for further iteration.
+
+Before adding a new frontend, create and approve:
+
+1. Product flow map.
+2. Wireframes for public feed, generation composer, auth/18+ gate, billing, profile, and admin.
+3. Component system decision.
+4. E2E test plan.
+5. Separate PR series with visible staging review before production docs claim frontend readiness.
 
 ## Launch workflow for local staging/demo
 
@@ -81,27 +80,26 @@ sh deploy/scripts/healthcheck-production.sh
 
 Open:
 
-- user app: `http://127.0.0.1/`
-- admin panel: `http://127.0.0.1/admin`
-- API health: `http://127.0.0.1/api/health`
+- gateway health: `http://127.0.0.1:4444/healthz`
+- API health: `http://127.0.0.1:4444/api/health`
+- frontend removal notice: `http://127.0.0.1:4444/`
 - MinIO console: `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`
+
+There is no user web app or admin web panel in this repo until a new frontend is built.
 
 ## Readiness status
 
-The latest frontend readiness report lives at:
-
-- `docs/FRONTEND_READINESS_REPORT.md`
-
 Current expected status:
 
-- ready for controlled staging/demo iteration;
-- not ready for full public paid production launch until blockers are closed.
+- backend/API stack is ready for controlled staging/demo validation;
+- frontend is intentionally removed and not ready;
+- full public paid production launch is blocked until a new UI, provider/payment approvals, and end-to-end callbacks are validated.
 
 Important blockers to keep visible:
 
+- no production frontend exists;
 - real blur/thumbnail processing is still not production-grade;
 - provider/payment written adult-category approval is required before real paid traffic;
-- frontend still needs feature extraction, UI test coverage, and E2E smoke tests;
 - staging must validate webhooks, payment callbacks, media delivery, admin actions, backup/restore.
 
 ## Safety and compliance boundaries
@@ -122,8 +120,7 @@ Update these docs when relevant:
 
 - `AGENTS.md` — contributor/agent operating rules;
 - `docs/PRODUCTION_DEPLOYMENT.md` — runbook for running the stack;
-- `docs/FRONTEND_AUDIT_ROADMAP.md` — frontend improvement plan;
-- `docs/FRONTEND_READINESS_REPORT.md` — honest readiness status;
+- `docs/FRONTEND_REMOVED.md` — status of removed frontend and rebuild rules;
 - `.env.example` / `deploy/env/production.env.example` — runtime configuration templates.
 
 ## Definition of done
