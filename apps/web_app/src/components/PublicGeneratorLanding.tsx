@@ -9,7 +9,6 @@ type PublicGeneratorLandingProps = {
   onOpenStudio: () => void;
 };
 
-const topCategories = ['AI Photo', 'AI Video', 'Anime', 'Realistic', 'Fantasy', 'Cosplay', 'Editorial', 'Private'];
 const contentTabs = ['Изображения', 'Видео', 'GIF'];
 const quickModes = ['Text to image', 'Image to video', 'Reference style', 'Cinematic scene'];
 const privacyModes = ['Private by default', 'Blur previews', '18+ gate'];
@@ -40,14 +39,6 @@ export function PublicGeneratorLanding({
 
   return (
     <main className="public-home">
-      <nav className="public-category-strip" aria-label="Быстрые категории">
-        {topCategories.map((category) => (
-          <button key={category} type="button" className="public-category-link">
-            {category}
-          </button>
-        ))}
-      </nav>
-
       <header className="public-header">
         <button className="public-brand" type="button" onClick={onOpenStudio} aria-label="AdultGen home">
           <span className="public-brand-mark">∞</span>
@@ -189,18 +180,6 @@ export function PublicGeneratorLanding({
           </p>
         </aside>
       </section>
-
-      <footer className="public-footer">
-        <strong>AdultGen AI</strong>
-        <button type="button">Русский</button>
-        <button type="button">Филиалы</button>
-        <button type="button">VIP</button>
-        <button type="button">FAQ</button>
-        <button type="button">Центр помощи</button>
-        <button type="button">Конфиденциальность</button>
-        <button type="button">Удаление AI-контента</button>
-        <button type="button">Поддержка биллинга</button>
-      </footer>
     </main>
   );
 }
