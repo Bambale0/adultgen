@@ -36,9 +36,8 @@ describe('PublicGeneratorLanding', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Создать в стиле Anime night' }));
 
-    expect(screen.getByLabelText('Описание сцены')).toHaveValue(
-      expect.stringContaining('anime scene, blue moonlight'),
-    );
+    const promptInput = screen.getByLabelText('Описание сцены') as HTMLTextAreaElement;
+    expect(promptInput.value).toContain('anime scene, blue moonlight');
   });
 
   it('calls start action from the primary CTA', () => {
