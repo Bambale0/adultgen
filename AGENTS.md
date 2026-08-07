@@ -1,135 +1,60 @@
 # AdultGen agent operating guide
 
-This repository is currently an API-first adult AI media platform backend. The previous web frontend was intentionally removed because it was not acceptable as a product UI.
-
-Use this file as the operating contract for Codex-style agents, AI assistants, and human developers working in this repo.
+AdultGen is a backend-first adult AI media platform with one replacement frontend under `apps/studio_app`.
 
 ## Current product shape
 
-- Core API: FastAPI backend under `src/adultgen`.
-- Admin API: backend endpoints protected by `ADMIN_API_TOKEN`.
-- Web frontend: intentionally removed. See `docs/FRONTEND_REMOVED.md`.
-- Storage: local development adapter and S3-compatible production adapter.
-- Production pack: API-only `docker-compose.production.yml`, `deploy/`, and `docs/PRODUCTION_DEPLOYMENT.md`.
+- Core API: `src/adultgen`.
+- Telegram gateway: `src/adultgen/telegram_gateway`.
+- Studio web/Mini App: `apps/studio_app`.
+- Production ingress: `deploy/nginx/gateway.conf`.
+- Frontend architecture and route contract: `docs/FRONTEND_REBUILD.md`.
 
 ## Hard rules
 
-1. Keep changes small and PR-based.
-2. Do not push risky rewrites directly into `main`.
-3. Do not claim production readiness unless CI is green and blockers are explicitly closed.
-4. Do not introduce a second wallet balance. Credits must flow through append-only wallet ledger entries.
-5. Do not bypass adult-safety policy checks.
-6. Do not implement adult payment/provider workarounds. Payment/provider/cloud usage must follow written approval and terms.
-7. Do not store secrets in the repository.
-8. Do not expose backend, Postgres, Redis, or MinIO publicly. Public ingress goes through Nginx.
-9. Prefer source-level smoke tests for architectural contracts when full integration tests are not yet available.
-10. If a PR changes runtime behavior, update the relevant runbook or status doc.
-11. Do not restore the removed frontend or copy it back. A future UI must start as a new implementation from an approved product brief.
+1. Keep changes focused and PR-based.
+2. Do not restore or copy code from the removed `apps/web_app` implementation.
+3. Do not duplicate wallet, pricing, moderation or model-capability business rules in the browser.
+4. Credits flow through the append-only backend wallet ledger.
+5. Backend adult-safety policy remains authoritative.
+6. Do not implement payment/provider workarounds or commit secrets.
+7. Do not expose backend, Postgres, Redis or MinIO publicly.
+8. Keep the Studio dependency-free unless a framework/library has a documented product need and migration plan.
+9. Every visible control must have a real state transition, disabled state, or explicit placeholder label.
+10. Runtime changes require CI, source-contract tests and runbook updates in the same PR.
 
-## Required checks before merge
-
-Every PR should pass:
+## Required checks
 
 ```bash
 ruff check .
 pytest
+cd apps/studio_app && npm run verify
 ```
 
-GitHub Actions runs these backend gates. A PR should stay draft until they pass.
+## Frontend conventions
 
-## Branch and PR workflow
+- Native ES modules only in the current foundation.
+- Pure reusable contracts belong in `src/core.js`.
+- Network access belongs in `src/api.js`.
+- Do not interpolate untrusted text without `escapeHtml` or safe DOM APIs.
+- Use design tokens from `src/styles.css`; do not scatter new hex values across feature code.
+- Preserve keyboard focus, reduced motion, semantic landmarks and responsive navigation.
+- Keep API paths behind `/api` so Studio and Core share one public origin.
+- Demo fixtures must be clearly separated from Core API responses and contain no explicit imagery.
 
-1. Create a focused branch from `main`.
-2. Make one logical change.
-3. Add or update tests.
-4. Open draft PR.
-5. Wait for CI.
-6. Fix Ruff/Pytest failures.
-7. Mark ready only after green CI.
-8. Merge to `main`.
+## Delivery workflow
 
-## Future frontend rebuild rule
+1. Branch from current `main`.
+2. Implement one coherent product slice.
+3. Add unit/source-contract tests.
+4. Run backend and Studio checks.
+5. Open a draft PR.
+6. Inspect GitHub Actions and fix failures.
+7. Perform desktop/mobile visual QA before production signoff.
+8. Merge only after green CI and an honest readiness note.
 
-The old frontend is not a base for further iteration.
+## Safety boundaries
 
-Before adding a new frontend, create and approve:
+Block or review minors, young-looking subjects, identity abuse, public figures, coercion, trafficking, hidden-camera content, exploitation, bestiality, incest, violence and other categories defined by backend policy.
 
-1. Product flow map.
-2. Wireframes for public feed, generation composer, auth/18+ gate, billing, profile, and admin.
-3. Component system decision.
-4. E2E test plan.
-5. Separate PR series with visible staging review before production docs claim frontend readiness.
-
-## Launch workflow for local staging/demo
-
-Use the production-like Compose pack from the repository root:
-
-```bash
-cp deploy/env/production.env.example .env.production
-chmod 600 .env.production
-```
-
-Edit `.env.production` and replace all `change-me` / `replace-me` values.
-
-Then run:
-
-```bash
-sh deploy/scripts/bootstrap-production.sh
-sh deploy/scripts/healthcheck-production.sh
-```
-
-Open:
-
-- gateway health: `http://127.0.0.1:4444/healthz`
-- API health: `http://127.0.0.1:4444/api/health`
-- frontend removal notice: `http://127.0.0.1:4444/`
-- MinIO console: `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`
-
-There is no user web app or admin web panel in this repo until a new frontend is built.
-
-## Readiness status
-
-Current expected status:
-
-- backend/API stack is ready for controlled staging/demo validation;
-- frontend is intentionally removed and not ready;
-- full public paid production launch is blocked until a new UI, provider/payment approvals, and end-to-end callbacks are validated.
-
-Important blockers to keep visible:
-
-- no production frontend exists;
-- real blur/thumbnail processing is still not production-grade;
-- provider/payment written adult-category approval is required before real paid traffic;
-- staging must validate webhooks, payment callbacks, media delivery, admin actions, backup/restore.
-
-## Safety and compliance boundaries
-
-AdultGen must block or route to review content involving:
-
-- minors or underage indicators;
-- non-consensual intimate imagery or real-person sexual identity abuse;
-- public figures in sexualized contexts;
-- coercion, trafficking, hidden camera, exploitation, bestiality, incest, or violence;
-- other categories defined by `src/adultgen/domain/adult_policy.py` and moderation services.
-
-Do not weaken policy checks for demo convenience.
-
-## Documentation ownership
-
-Update these docs when relevant:
-
-- `AGENTS.md` — contributor/agent operating rules;
-- `docs/PRODUCTION_DEPLOYMENT.md` — runbook for running the stack;
-- `docs/FRONTEND_REMOVED.md` — status of removed frontend and rebuild rules;
-- `.env.example` / `deploy/env/production.env.example` — runtime configuration templates.
-
-## Definition of done
-
-A task is done only when:
-
-- code is merged into `main`;
-- CI is green;
-- docs are updated if runtime/product behavior changed;
-- remaining limitations are explicitly called out;
-- no secrets are committed;
-- no safety/payment/provider policy has been bypassed.
+The 18+ gate is an entry control, not a substitute for moderation.

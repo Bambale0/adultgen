@@ -1,93 +1,65 @@
 # AdultGen
 
-Telegram-first AI media generation platform with Mini App, multi-reference cinematic workflows, internal credits, partner payouts, moderation, global feed, and replaceable Telegram bot channels.
+Telegram-first AI media generation platform with a backend-first Core API and a responsive AdultGen Studio client.
 
-## Documentation languages
+## Current product surfaces
 
-- English documentation entrypoint: [`docs/en/README.md`](docs/en/README.md)
-- Русская документация: [`docs/ru/README.md`](docs/ru/README.md)
+- `src/adultgen` — FastAPI Core API, domain rules, provider callbacks, billing, moderation and storage.
+- `src/adultgen/telegram_gateway` — replaceable Telegram delivery/gateway channel.
+- `apps/studio_app` — new responsive web and Telegram Mini App client.
+- `docker-compose.production.yml` — Postgres, Redis, MinIO, backend, Studio and Nginx gateway.
 
-Canonical detailed English documents currently live in the root `docs/` directory. Russian companion documents live in `docs/ru/` and must be updated together with the English docs when architecture, model capabilities, billing, safety, or API contracts change.
+The previous frontend was removed and is not used as a base. The current rebuild contract is documented in [`docs/FRONTEND_REBUILD.md`](docs/FRONTEND_REBUILD.md).
 
-## Architecture direction
+## Studio routes
 
-AdultGen is designed as a backend-first platform:
+- `/feed`
+- `/create`
+- `/publication/{id}`
+- `/profile/{public_id}`
+- `/projects`
+- `/billing`
 
-- Telegram bots are replaceable gateway clients.
-- Canonical users are keyed by `telegram_user_id`, not by bot.
-- Wallets use an append-only ledger.
-- Payment webhooks are captured as immutable raw records before processing.
-- Temporary generation media expires after 24 hours unless published.
-- Published profile/feed media is stored permanently until user/admin deletion.
-- Adult feed access requires 18+ consent and admin-controlled moderation.
-- Model capabilities are explicit: Seedream and Seedance payloads are selected through scenario-specific provider capability rules, not a single generic generation form.
+## Local frontend verification
 
-## MVP product scope
-
-- Telegram bot + Mini App.
-- Manual project and scene creation.
-- Saved avatar photo sets.
-- Seedream 5 Pro image generation/editing.
-- Seedance 2.0 video generation with text-to-video, first-frame, first+last-frame, and multimodal reference workflows.
-- Optional manually invoked AI Director.
-- Parallel generation jobs.
-- Internal credits and subscription plans.
-- SharPay/CrocoPay adapters behind Billing Gateway.
-- Partner program: 20% first payment, 5% follow-up payments for 90 days.
-- Public/private user profiles.
-- One global adult feed with likes, saves, remix, reports, and no comments.
-- Admin panel for payments, feed, moderation, payouts, broadcasts, mirrors, and audit.
-
-## Repository structure
-
-```text
-docs/
-├── en/
-│   └── README.md
-├── ru/
-│   ├── README.md
-│   ├── ARCHITECTURE.md
-│   ├── API_CONTRACTS.md
-│   ├── MODEL_CAPABILITIES.md
-│   ├── OPERATIONAL_FLOWS.md
-│   └── SAFETY_COMPLIANCE.md
-├── ARCHITECTURE.md
-├── API_CONTRACTS.md
-├── DATA_MODEL.md
-├── MODEL_CAPABILITIES.md
-├── OPERATIONAL_FLOWS.md
-├── ROADMAP.md
-└── SAFETY_COMPLIANCE.md
-
-src/adultgen/
-├── apps/
-│   └── core_api.py
-├── domain/
-│   └── enums.py
-└── config.py
+```bash
+cd apps/studio_app
+npm run verify
 ```
 
-## Local infrastructure
+The Studio package intentionally has no runtime or build dependencies. Node 22 runs syntax checks, unit tests and the deterministic static build.
+
+## Local backend infrastructure
 
 ```bash
 cp .env.example .env
 docker compose up -d
-```
-
-Run Core API after installing dependencies:
-
-```bash
 uvicorn adultgen.apps.core_api:app --reload
 ```
 
-Health check:
+## Production-like launch
 
 ```bash
-curl http://localhost:8000/health
+cp deploy/env/production.env.example .env.production
+chmod 600 .env.production
+sh deploy/scripts/bootstrap-production.sh
+sh deploy/scripts/healthcheck-production.sh
 ```
 
-## Development status
+Default staging URLs:
 
-Current branch contains the architecture baseline and initial Python scaffold. Implementation should proceed by phases in `docs/ROADMAP.md`.
+- Studio: `http://127.0.0.1:4444/`
+- API health: `http://127.0.0.1:4444/api/health`
+- gateway health: `http://127.0.0.1:4444/healthz`
 
-Before implementing the generation worker or Mini App creation flow, read `docs/MODEL_CAPABILITIES.md` and `docs/ru/MODEL_CAPABILITIES.md`. They define the exact Seedream/Seedance operation split, payload mapping, mutual exclusion rules, callback behavior, and provider validation requirements.
+## Architecture principles
+
+- Telegram bots and web clients are replaceable channels around one Core API.
+- Canonical users are keyed independently from a specific bot.
+- Credits use an append-only wallet ledger.
+- Payment webhooks are captured before processing.
+- Temporary generation media expires unless published.
+- Adult feed access requires consent and backend moderation.
+- Model capability validation and pricing remain authoritative on the backend.
+
+Read `docs/MODEL_CAPABILITIES.md`, `docs/API_CONTRACTS.md` and `docs/SAFETY_COMPLIANCE.md` before changing generation, billing or moderation flows.
