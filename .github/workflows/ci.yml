@@ -53,6 +53,10 @@ jobs:
         working-directory: apps/orbital_web
         run: npm run typecheck
 
+      - name: Test web app
+        working-directory: apps/orbital_web
+        run: npm run test
+
       - name: Build web app
         working-directory: apps/orbital_web
         env:
