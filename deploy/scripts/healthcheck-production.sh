@@ -14,7 +14,8 @@ BASE_URL=${BASE_URL:-http://127.0.0.1:${HTTP_PORT:-4444}}
 
 curl -fsS "$BASE_URL/healthz" >/dev/null
 curl -fsS "$BASE_URL/api/health" >/dev/null
+curl -fsS "$BASE_URL/" >/dev/null
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
 
-echo "AdultGen healthcheck passed for $BASE_URL"
+echo "AdultGen healthcheck passed for API + Orbital Web at $BASE_URL"
