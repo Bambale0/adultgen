@@ -1,40 +1,23 @@
-# Frontend removed
+# Historical frontend removal
 
-Status: intentionally removed from the repository.
+Status: the rejected historical frontend remains intentionally removed.
 
-The previous `apps/web_app` implementation was removed because it was not acceptable as a product UI. The repository now keeps the backend/core API, admin API surface, media/generation/payment/domain logic, storage adapters, and production API deployment stack.
+The old `apps/web_app` implementation was deleted because it was not acceptable as a product UI. It must not be restored or used as the visual base for future work.
 
-## What was removed
+A new, independent frontend line now starts at:
 
-- React/Vite web app under `apps/web_app`.
-- Frontend Docker image and static nginx config.
-- Frontend CI jobs for typecheck/lint/test/build.
-- Obsolete frontend audit/readiness docs.
+- `apps/orbital_web`
+- `docs/FRONTEND_PRODUCT_BRIEF_V2.md`
 
-## What remains
+The new Orbital Web package was designed from a newly approved reference direction and only reuses backend API contracts, not the removed UI implementation.
 
-- Core FastAPI backend.
-- Admin API endpoints.
-- Telegram/provider/payment/media domain code.
-- Production Compose stack for backend dependencies and API gateway.
-- API gateway route: `/api/*`.
+## Historical removal included
 
-## Current launch surface
+- old React/Vite app under `apps/web_app`;
+- old frontend Docker/static Nginx setup;
+- old admin web panel;
+- old frontend audit/readiness docs.
 
-The production gateway is API-only until a new frontend is designed and approved.
+## Rule going forward
 
-- `/healthz` returns gateway health.
-- `/api/health` returns backend health through the gateway.
-- `/` returns a plain text notice that the frontend is removed.
-
-## Next frontend rebuild rule
-
-Do not reintroduce a frontend by iterating on the removed UI. Start a new UI package from a clear product brief, design system, and approved reference direction.
-
-Required before adding a new frontend:
-
-1. Product flow map.
-2. Wireframes for public feed, generation composer, auth/18+ gate, billing, profile, and admin.
-3. Component system decision.
-4. E2E test plan.
-5. Separate PR series with visible staging review before production docs claim frontend readiness.
+Do not recover `apps/web_app` from Git history or copy its component/layout code. Extend Orbital Web through focused PRs, keep CI/typecheck/build green, and require visual staging review before claiming production readiness.
