@@ -1,12 +1,13 @@
 # AdultGen production deployment runbook
 
-This runbook is the production-oriented deployment pack for the current API-only AdultGen stack.
+This runbook is the production-oriented deployment pack for AdultGen Core API plus the new Orbital Web frontend.
 
-The previous React/Vite frontend has been intentionally removed from the repository. See `docs/FRONTEND_REMOVED.md`.
+The rejected historical `apps/web_app` UI remains deleted. The current web surface is a fresh implementation under `apps/orbital_web`, based on the approved Orbital product brief in `docs/FRONTEND_PRODUCT_BRIEF_V2.md`.
 
 It runs:
 
-- `nginx` public API gateway on `${HTTP_PORT:-4444}`;
+- `nginx` public gateway on `${HTTP_PORT:-4444}`;
+- `web` static Orbital Web container;
 - `backend` FastAPI Core API;
 - `postgres` durable application database;
 - `redis` durable queue/cache state;
@@ -17,32 +18,17 @@ It runs:
 Current intended status:
 
 - backend/API stack is suitable for controlled staging/demo validation;
-- there is no production frontend in this repository;
-- public paid production launch still requires a new approved frontend, provider/payment approval, and end-to-end callback validation.
+- Orbital Web is suitable for UI staging/review, not yet declared fully production-ready;
+- public paid launch still requires provider/payment approval plus end-to-end callback and media validation.
 
 ## 0. Before you start
 
 Requirements on the host:
 
-- Ubuntu server or another Linux host with Docker Engine and Compose v2;
-- outbound HTTPS access from the host/container network for provider APIs;
+- Linux host with Docker Engine and Compose v2;
+- outbound HTTPS access for provider APIs and Google Fonts (or self-host fonts later);
 - free local ports for `${HTTP_PORT:-4444}` and `${MINIO_CONSOLE_PORT:-9001}`;
-- enough disk space for Postgres and MinIO volumes.
-
-Port note for Ubuntu:
-
-- `127.0.0.1` without a port means port `80`.
-- This stack defaults to `HTTP_PORT=4444` for local/staging smoke tests to avoid conflicts with host Nginx/Apache/Caddy and privileged-port setup.
-- For real public production behind host-level TLS, set `HTTP_PORT=80` or put Caddy/Nginx/Cloudflare Tunnel in front of `127.0.0.1:4444`.
-
-From repository root, confirm the deployment files exist:
-
-```bash
-ls docker-compose.production.yml
-ls deploy/env/production.env.example
-ls deploy/scripts/bootstrap-production.sh
-ls deploy/scripts/healthcheck-production.sh
-```
+- enough disk for Postgres and MinIO volumes.
 
 ## 1. Prepare environment
 
@@ -53,22 +39,20 @@ chmod 600 .env.production
 
 Fill every `change-me-*` / `replace-me-*` value before starting the stack. The helper script refuses to start while placeholders are still present.
 
-Public callback URLs should point through the gateway `/api` prefix:
+Public callback URLs continue to point through `/api`:
 
 ```env
 BILLING_BASE_URL=https://your-domain.example
 KIE_CALLBACK_URL=https://your-domain.example/api/webhooks/kie
 ```
 
-For a local smoke/demo run on Ubuntu, use localhost values with the default demo port:
+For a local smoke run:
 
 ```env
 HTTP_PORT=4444
 BILLING_BASE_URL=http://127.0.0.1:4444
 KIE_CALLBACK_URL=http://127.0.0.1:4444/api/webhooks/kie
 ```
-
-Provider/payment values can be filled with non-placeholder dummy values for an API-only smoke run. Real generation/payment callbacks require real approved provider credentials.
 
 ## 2. One-command bootstrap
 
@@ -77,38 +61,16 @@ sh deploy/scripts/bootstrap-production.sh
 sh deploy/scripts/healthcheck-production.sh
 ```
 
-This builds the backend image, starts infrastructure, creates buckets, runs migrations, starts the API tier, and verifies gateway/API health.
+The script builds backend + Orbital Web, starts infrastructure, creates buckets, runs migrations, then starts `backend web nginx`.
 
 ## 3. Manual launch sequence
 
-Build images:
-
 ```bash
 docker compose --env-file .env.production -f docker-compose.production.yml build
-```
-
-Start infrastructure:
-
-```bash
 docker compose --env-file .env.production -f docker-compose.production.yml up -d postgres redis minio
-```
-
-Create object-storage buckets:
-
-```bash
 docker compose --env-file .env.production -f docker-compose.production.yml --profile setup run --rm create-buckets
-```
-
-Run migrations:
-
-```bash
 docker compose --env-file .env.production -f docker-compose.production.yml --profile migrate run --rm migrate
-```
-
-Start API tier:
-
-```bash
-docker compose --env-file .env.production -f docker-compose.production.yml up -d backend nginx
+docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
 ```
 
 ## 4. Verify health
@@ -119,61 +81,71 @@ curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/api/health
 curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/
 ```
 
-Expected responses:
+Expected:
 
-- `/healthz` -> `ok`
-- `/api/health` -> backend health response
-- `/` -> plain text notice that the frontend has been removed
+- `/healthz` -> gateway `ok`;
+- `/api/health` -> Core API health;
+- `/` -> Orbital Web HTML.
 
 ## 5. Access paths
 
-Current public gateway paths:
+- Orbital Web: `http://SERVER_IP:4444/`
+- Deploy Studio: `http://SERVER_IP:4444/studio`
+- Telemetry: `http://SERVER_IP:4444/missions`
+- Operator profile: `http://SERVER_IP:4444/profile`
+- Credits: `http://SERVER_IP:4444/billing`
+- Core API: `http://SERVER_IP:4444/api/*`
+- Gateway health: `http://SERVER_IP:4444/healthz`
 
-- `http://SERVER_IP:4444/healthz`
-- `http://SERVER_IP:4444/api/health`
-- `http://SERVER_IP:4444/api/*`
+MinIO console remains localhost-bound by default at `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`.
 
-MinIO console remains localhost-bound by default:
+Admin remains API-only in this foundation PR. Use `/api/admin/*` with the backend admin authorization contract; a privileged Orbital admin surface should be delivered separately.
 
-- `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`
+## 6. Local frontend development
 
-There is intentionally no web UI route. `/admin` is also unavailable because the previous admin web panel was part of the removed frontend. Use Admin API endpoints under `/api/admin/*` with `ADMIN_API_TOKEN`.
+Run Core API locally, then:
 
-## 6. Logs
+```bash
+cd apps/orbital_web
+npm install
+npm run dev
+```
+
+Vite proxies local `/api` requests to `http://127.0.0.1:8000`. Production builds use same-origin `/api` through gateway Nginx.
+
+## 7. Logs
 
 ```bash
 sh deploy/scripts/tail-production-logs.sh
 ```
 
-Or manually:
+Or:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.production.yml logs -f backend nginx postgres redis minio
+docker compose --env-file .env.production -f docker-compose.production.yml logs -f backend web nginx postgres redis minio
 ```
 
-## 7. Update flow
+## 8. Update flow
 
 ```bash
 git pull origin main
-docker compose --env-file .env.production -f docker-compose.production.yml build backend nginx
+docker compose --env-file .env.production -f docker-compose.production.yml build backend web
 docker compose --env-file .env.production -f docker-compose.production.yml --profile migrate run --rm migrate
-docker compose --env-file .env.production -f docker-compose.production.yml up -d backend nginx
+docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
 sh deploy/scripts/healthcheck-production.sh
 ```
 
-## 8. Backup and restore baseline
+## 9. Backup and restore baseline
 
 Back up Postgres and MinIO volumes before destructive changes.
-
-Minimum Postgres dump:
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.production.yml exec postgres \
   pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > adultgen-postgres.sql
 ```
 
-Minimum object-storage backup should copy the MinIO bucket data or use `mc mirror` from a trusted admin host.
+Object-storage backup should mirror trusted MinIO bucket data from an admin host.
 
-## 9. Frontend rebuild rule
+## 10. Frontend rebuild rule
 
-Do not reintroduce the removed frontend by restoring old files. A new UI must start as a new product/design implementation with its own PR series, tests, and staging review.
+Do not restore `apps/web_app` or copy its UI back. The accepted frontend line begins at `apps/orbital_web` and `docs/FRONTEND_PRODUCT_BRIEF_V2.md`. Production readiness still requires visible staging review and green CI.
