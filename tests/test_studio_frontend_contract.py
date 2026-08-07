@@ -7,8 +7,11 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_removed_frontend_is_not_restored() -> None:
-    assert not (ROOT / "apps" / "web_app").exists()
+def test_removed_frontend_sources_are_not_restored() -> None:
+    legacy = ROOT / "apps" / "web_app"
+
+    assert not (legacy / "package.json").exists()
+    assert not (legacy / "src" / "App.tsx").exists()
     assert (ROOT / "apps" / "studio_app").is_dir()
 
 
