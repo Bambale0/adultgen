@@ -7,13 +7,14 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_web_package_exposes_vitest_gate() -> None:
-    package = read("apps/web_app/package.json")
+def test_orbital_package_exposes_vitest_gate() -> None:
+    package = read("apps/orbital_web/package.json")
 
     assert '"test": "vitest run"' in package
-    assert '"vitest": "latest"' in package
-    assert '"@testing-library/react": "latest"' in package
-    assert '"jsdom": "latest"' in package
+    assert '"vitest": "^4.1.7"' in package
+    assert '"@testing-library/react": "^16.3.2"' in package
+    assert '"@testing-library/jest-dom": "^7.0.0"' in package
+    assert '"jsdom": "^30.0.1"' in package
 
 
 def test_ci_runs_frontend_tests_before_build() -> None:
@@ -25,18 +26,19 @@ def test_ci_runs_frontend_tests_before_build() -> None:
 
 
 def test_vitest_config_uses_jsdom_for_react_tests() -> None:
-    config = read("apps/web_app/vitest.config.ts")
+    config = read("apps/orbital_web/vitest.config.ts")
 
     assert "environment: 'jsdom'" in config
     assert "@vitejs/plugin-react" in config
     assert "src/**/*.test.{ts,tsx}" in config
+    assert "setupFiles: ['./src/test/setup.ts']" in config
 
 
-def test_app_shell_has_react_testing_library_coverage() -> None:
-    test_file = read("apps/web_app/src/components/AppShell.test.tsx")
+def test_orbital_shell_has_react_testing_library_coverage() -> None:
+    test_file = read("apps/orbital_web/src/App.test.tsx")
 
     assert "@testing-library/react" in test_file
-    assert "describe('AppShell'" in test_file
-    assert "renders shell regions and children" in test_file
-    assert "renders sidebar routes from route metadata" in test_file
-    assert "renders topbar status and route selector" in test_file
+    assert "describe('Orbital Web shell'" in test_file
+    assert "renders safe feed before an operator session exists" in test_file
+    assert "opens identity handshake instead of bypassing a protected route" in test_file
+    assert "renders route sectors from the product navigation" in test_file

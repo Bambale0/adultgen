@@ -7,45 +7,47 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_app_shell_components_are_extracted_from_legacy_app_shape() -> None:
-    shell = read("apps/web_app/src/components/AppShell.tsx")
+def test_orbital_app_has_explicit_product_shell_regions() -> None:
+    app = read("apps/orbital_web/src/App.tsx")
 
-    assert "export function AppShell" in shell
-    assert "export function Sidebar" in shell
-    assert "export function TopBar" in shell
-    assert "className=\"web-shell\"" in shell
-    assert "className=\"sidebar\"" in shell
-    assert "className=\"topbar\"" in shell
-    assert "aria-label=\"Основная навигация сайта\"" in shell
-    assert "aria-label=\"Route selector\"" in shell
-    assert "aria-live=\"polite\"" in shell
-
-
-def test_shell_components_depend_on_route_metadata_not_magic_labels() -> None:
-    shell = read("apps/web_app/src/components/AppShell.tsx")
-
-    assert "type SidebarRoute = Pick<WebAppRoute, 'id' | 'title'>" in shell
-    assert "activeRoute.id" in shell
-    assert "routeResolver" in shell
-    assert "routes.map" in shell
-    assert "onNavigate" in shell
+    for component in [
+        "function Sidebar(",
+        "function Topbar(",
+        "function FeedScreen(",
+        "function StudioScreen(",
+        "function TelemetryScreen(",
+        "function ProfileScreen(",
+        "function BillingScreen(",
+    ]:
+        assert component in app
+    assert '<aside className="sidebar">' in app
+    assert '<header className="topbar">' in app
+    assert '<main className="orbital-main">' in app
 
 
-def test_routed_user_app_has_shell_migration_boundary() -> None:
-    routed = read("apps/web_app/src/RoutedUserApp.tsx")
+def test_sidebar_navigation_is_driven_by_route_metadata() -> None:
+    app = read("apps/orbital_web/src/App.tsx")
 
-    assert "import { AppShell, Sidebar, TopBar } from './components/AppShell';" in routed
-    assert "type ShellExtractionStage" in routed
-    assert "getShellExtractionStage" in routed
-    assert "ShellContractHarness" in routed
-    assert "primaryWebAppRoutes" in routed
-    assert "webAppRoutes" in routed
-    assert "<App key={activeRoute.path} />" in routed
+    assert "const routes:" in app
+    assert "routes.map((item)" in app
+    assert "onNavigate(item.id)" in app
+    assert "route === item.id" in app
 
 
-def test_frontend_roadmap_requires_app_shell_sidebar_topbar_extraction() -> None:
-    roadmap = read("docs/FRONTEND_AUDIT_ROADMAP.md")
+def test_shared_tactical_primitives_are_reused() -> None:
+    app = read("apps/orbital_web/src/App.tsx")
 
-    assert "`AppShell`/`Sidebar`/`TopBar` extraction" in roadmap
-    assert "Move feature UI into `features/*` modules" in roadmap
-    assert "Move shared UI primitives into `components/*`" in roadmap
+    assert "function PanelHeader(" in app
+    assert "function ParamRow(" in app
+    assert "function Kpi(" in app
+    assert "function Status(" in app
+    assert "function TaskRows(" in app
+
+
+def test_product_brief_records_local_component_system_decision() -> None:
+    brief = read("docs/FRONTEND_PRODUCT_BRIEF_V2.md")
+
+    assert "Component system decision" in brief
+    assert "No component framework" in brief
+    assert "visual primitives are local CSS/React" in brief
+    assert "tactical panel" in brief

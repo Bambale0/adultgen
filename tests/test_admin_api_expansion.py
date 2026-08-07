@@ -53,15 +53,12 @@ def test_admin_schemas_cover_lists_and_mutations() -> None:
     assert "Literal[\"purchased\", \"subscription\", \"bonus\"]" in schemas
 
 
-def test_web_admin_client_targets_new_admin_endpoints() -> None:
-    client = read("apps/web_app/src/adminApi.ts")
+def test_orbital_user_bundle_does_not_embed_admin_token_client() -> None:
+    app = read("apps/orbital_web/src/App.tsx")
+    api = read("apps/orbital_web/src/api.ts")
+    brief = read("docs/FRONTEND_PRODUCT_BRIEF_V2.md")
 
-    assert "fetchAdminUsers" in client
-    assert "updateAdminUserCapabilities" in client
-    assert "fetchAdminGenerations" in client
-    assert "fetchAdminPublications" in client
-    assert "applyAdminPublicationAction" in client
-    assert "fetchAdminPaymentOrders" in client
-    assert "createAdminWalletAdjustment" in client
-    assert "fetchAdminAuditEvents" in client
-    assert "Authorization" in client
+    assert "ADMIN_API_TOKEN" not in app
+    assert "ADMIN_API_TOKEN" not in api
+    assert "/admin" not in api
+    assert "Admin remains an independent privileged surface" in brief

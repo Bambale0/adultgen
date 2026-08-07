@@ -7,36 +7,30 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_web_styles_use_compact_staging_layout() -> None:
-    styles = read("apps/web_app/src/styles.css")
-
-    assert "grid-template-columns: 260px minmax(0, 1fr)" in styles
-    assert "width: min(100%, 1480px)" in styles
-    assert "padding: 18px" in styles
-    assert "height: calc(100vh - 36px)" in styles
-    assert "font-size: 34px" in styles
-    assert "clamp(32px, 4vw, 48px)" in styles
-    assert "min-height: 230px" in styles
-    assert "min-height: 160px" in styles
+def test_web_styles_use_orbital_tokens() -> None:
+    styles = read("apps/orbital_web/src/styles.css")
+    assert "--bg: #131313" in styles
+    assert "--pink: #ff45a2" in styles
+    assert "--cyan: #00f2ff" in styles
+    assert "--lime: #a0f11c" in styles
+    assert "font-family: 'JetBrains Mono'" in styles
 
 
-def test_web_styles_do_not_use_old_oversized_hero_shell() -> None:
-    styles = read("apps/web_app/src/styles.css")
-
-    assert "grid-template-columns: 320px minmax(0, 1fr)" not in styles
-    assert "height: calc(100vh - 48px)" not in styles
-    assert "font-size: 52px" not in styles
-    assert "clamp(36px, 6vw, 72px)" not in styles
-    assert "clamp(28px, 4vw, 46px)" not in styles
-    assert "min-height: 320px" not in styles
-
-
-def test_web_styles_keep_product_navigation_and_result_cards_visible() -> None:
-    styles = read("apps/web_app/src/styles.css")
-
-    assert ".route-button.active" in styles
+def test_web_styles_keep_orbital_navigation_and_feed() -> None:
+    styles = read("apps/orbital_web/src/styles.css")
+    assert ".sidebar" in styles
+    assert "width: 280px" in styles
     assert ".topbar" in styles
-    assert ".landing-grid" in styles
-    assert ".studio-grid" in styles
-    assert ".result-card" in styles
-    assert ".generation-grid" in styles
+    assert ".scanline-layer" in styles
+    assert ".masonry-feed" in styles
+    assert ".signal-card" in styles
+
+
+def test_web_styles_cover_product_surfaces_and_mobile() -> None:
+    styles = read("apps/orbital_web/src/styles.css")
+    assert ".deploy-grid" in styles
+    assert ".telemetry-layout" in styles
+    assert ".profile-grid" in styles
+    assert ".wallet-hero" in styles
+    assert ".package-grid" in styles
+    assert "@media (max-width: 820px)" in styles

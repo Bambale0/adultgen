@@ -18,6 +18,6 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d postgres redis minio
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --profile setup run --rm create-buckets
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --profile migrate run --rm migrate
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d backend nginx
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d backend web nginx
 
-echo "AdultGen API-only production stack started. Run deploy/scripts/healthcheck-production.sh to verify."
+echo "AdultGen backend + Orbital Web stack started. Run deploy/scripts/healthcheck-production.sh to verify."

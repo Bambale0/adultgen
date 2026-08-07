@@ -7,69 +7,45 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_admin_panel_is_standalone_entrypoint() -> None:
-    main = read("apps/web_app/src/main.tsx")
+def test_orbital_web_has_no_public_admin_route() -> None:
+    app = read("apps/orbital_web/src/App.tsx")
 
-    assert "import { AdminPanel } from './AdminPanel';" in main
-    assert "window.location.pathname.startsWith('/admin')" in main
-    assert "<AdminPanel />" in main
-    assert "<RoutedUserApp />" in main
-    assert "./admin.css" in main
+    assert "type RouteId = 'feed' | 'studio' | 'missions' | 'profile' | 'billing'" in app
+    assert "path: '/admin'" not in app
+    assert "ADMIN_API_TOKEN" not in app
 
 
-def test_admin_panel_has_professional_workspace_sections() -> None:
-    panel = read("apps/web_app/src/AdminPanel.tsx")
+def test_orbital_api_client_does_not_embed_admin_credentials() -> None:
+    client = read("apps/orbital_web/src/api.ts")
 
-    assert "AdultGen Admin" in panel
-    assert "Control Room" in panel
-    assert "type AdminTab" in panel
-    assert "'overview' | 'users' | 'generations' | 'publications' | 'payments' | 'wallet' | 'audit'" in panel
-    assert "AdminOverview" in panel
-    assert "AdminUsersSection" in panel
-    assert "AdminGenerationsSection" in panel
-    assert "AdminPublicationsSection" in panel
-    assert "AdminPaymentsSection" in panel
-    assert "AdminWalletSection" in panel
-    assert "AdminAuditSection" in panel
+    assert "ADMIN_API_TOKEN" not in client
+    assert "adultgen_admin_token" not in client
+    assert "fetchAdminUsers" not in client
+    assert "createAdminWalletAdjustment" not in client
 
 
-def test_admin_panel_keeps_token_and_dangerous_actions_separate() -> None:
-    panel = read("apps/web_app/src/AdminPanel.tsx")
+def test_backend_admin_surface_stays_token_protected() -> None:
+    router = read("src/adultgen/api/routers/admin.py")
 
-    assert "adultgen_admin_token" in panel
-    assert "localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY" in panel
-    assert "localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY)" in panel
-    assert "reason" in panel
-    assert "updateAdminUserCapabilities" in panel
-    assert "applyAdminPublicationAction" in panel
-    assert "createAdminWalletAdjustment" in panel
-    assert "fetchAdminAuditEvents" in panel
+    assert "require_admin_api_token" in router
+    assert '"/users"' in router
+    assert '"/generations"' in router
+    assert '"/publications"' in router
+    assert '"/wallet/adjustments"' in router
+    assert '"/audit/events"' in router
 
 
-def test_admin_css_isolated_from_user_styles() -> None:
-    css = read("apps/web_app/src/admin.css")
+def test_product_brief_keeps_admin_as_separate_surface() -> None:
+    brief = read("docs/FRONTEND_PRODUCT_BRIEF_V2.md")
 
-    assert ".admin-shell" in css
-    assert ".admin-sidebar" in css
-    assert ".admin-main-panel" in css
-    assert ".admin-table" in css
-    assert ".admin-two-column" in css
-    assert "@media (max-width: 1180px)" in css
+    assert "`/admin` — separate future surface" in brief
+    assert "Admin remains an independent privileged surface" in brief
+    assert "intentionally not mixed into the public/user bundle" in brief
 
 
-def test_admin_client_backing_methods_are_used() -> None:
-    panel = read("apps/web_app/src/AdminPanel.tsx")
-    client = read("apps/web_app/src/adminApi.ts")
+def test_runbook_documents_api_only_admin_foundation() -> None:
+    runbook = read("docs/PRODUCTION_DEPLOYMENT.md")
 
-    for method in [
-        "fetchAdminUsers",
-        "fetchAdminGenerations",
-        "fetchAdminPublications",
-        "fetchAdminPaymentOrders",
-        "fetchAdminAuditEvents",
-        "updateAdminUserCapabilities",
-        "applyAdminPublicationAction",
-        "createAdminWalletAdjustment",
-    ]:
-        assert method in panel
-        assert method in client
+    assert "Admin remains API-only in this foundation PR" in runbook
+    assert "/api/admin/*" in runbook
+    assert "privileged Orbital admin surface should be delivered separately" in runbook

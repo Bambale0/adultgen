@@ -84,13 +84,13 @@ def test_moderation_service_prioritizes_and_hides_publications() -> None:
     assert "list_open_moderation_cases" in service
 
 
-def test_web_client_exposes_report_and_admin_moderation_methods() -> None:
-    api = read("apps/web_app/src/api.ts")
+def test_orbital_user_client_exposes_reports_without_admin_moderation_token() -> None:
+    api = read("apps/orbital_web/src/api.ts")
+    app = read("apps/orbital_web/src/App.tsx")
 
-    assert "type ModerationCase" in api
-    assert "reportPublication" in api
-    assert "fetchAdminModerationCases" in api
-    assert "resolveAdminModerationCase" in api
+    assert "reportPublication(token: string, publicationId: string" in api
     assert "`/publications/${publicationId}/reports`" in api
-    assert "'/admin/moderation/cases?limit=" not in api
-    assert "`/admin/moderation/cases?limit=${limit}`" in api
+    assert "fetchAdminModerationCases" not in api
+    assert "resolveAdminModerationCase" not in api
+    assert "api.reportPublication" in app
+    assert "MODERATION ACTIVE" in app
