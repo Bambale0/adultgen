@@ -30,3 +30,31 @@ jobs:
 
       - name: Pytest
         run: pytest
+
+  orbital-web-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/orbital_web/package.json
+
+      - name: Install web dependencies
+        working-directory: apps/orbital_web
+        run: npm install
+
+      - name: Typecheck web app
+        working-directory: apps/orbital_web
+        run: npm run typecheck
+
+      - name: Build web app
+        working-directory: apps/orbital_web
+        env:
+          VITE_CORE_API_URL: /api
+        run: npm run build
