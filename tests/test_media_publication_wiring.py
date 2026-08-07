@@ -5,8 +5,8 @@ CORE_API = ROOT / "src" / "adultgen" / "apps" / "core_api.py"
 MEDIA_ROUTER = ROOT / "src" / "adultgen" / "api" / "routers" / "media.py"
 PUBLICATIONS_ROUTER = ROOT / "src" / "adultgen" / "api" / "routers" / "publications.py"
 PUBLICATION_SERVICE = ROOT / "src" / "adultgen" / "services" / "publications.py"
-WEB_API = ROOT / "apps" / "web_app" / "src" / "api.ts"
-WEB_APP = ROOT / "apps" / "web_app" / "src" / "App.tsx"
+WEB_API = ROOT / "apps" / "orbital_web" / "src" / "api.ts"
+WEB_APP = ROOT / "apps" / "orbital_web" / "src" / "App.tsx"
 
 
 def test_core_api_registers_media_publication_routes() -> None:
@@ -40,17 +40,16 @@ def test_publication_feed_routes_exist() -> None:
     assert "PublicationStatus.ACTIVE" in service_content
 
 
-def test_web_app_wires_media_publication_feed_collection() -> None:
+def test_orbital_web_wires_live_feed_collection_report_and_reference_upload() -> None:
     api_content = WEB_API.read_text(encoding="utf-8")
     app_content = WEB_APP.read_text(encoding="utf-8")
 
-    assert "uploadTemporaryMedia" in api_content
-    assert "uploadReferenceMedia" in api_content
-    assert "createPublication" in api_content
-    assert "fetchFeed" in api_content
-    assert "savePublication" in api_content
-    assert "fetchSavedCollection" in api_content
-    assert "type=\"file\"" in app_content
-    assert "Опубликовать последний upload" in app_content
-    assert "Обновить ленту" in app_content
-    assert "В коллекцию" in app_content
+    assert "uploadReference(token: string, file: File)" in api_content
+    assert "feed(limit = 30)" in api_content
+    assert "savePublication(token: string, publicationId: string)" in api_content
+    assert "reportPublication(token: string, publicationId: string" in api_content
+    assert 'type="file"' in app_content
+    assert "api.feed()" in app_content
+    assert "api.savePublication" in app_content
+    assert "api.reportPublication" in app_content
+    assert "STORE PRIVATE REFERENCE" in app_content
