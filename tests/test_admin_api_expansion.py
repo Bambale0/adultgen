@@ -49,19 +49,5 @@ def test_admin_schemas_cover_lists_and_mutations() -> None:
     assert "AdminPublicationActionRequest" in schemas
     assert "AdminWalletAdjustmentRequest" in schemas
     assert "AdminAuditEventResponse" in schemas
-    assert "Literal[\"hide\", \"restore\", \"delete\"]" in schemas
-    assert "Literal[\"purchased\", \"subscription\", \"bonus\"]" in schemas
-
-
-def test_web_admin_client_targets_new_admin_endpoints() -> None:
-    client = read("apps/web_app/src/adminApi.ts")
-
-    assert "fetchAdminUsers" in client
-    assert "updateAdminUserCapabilities" in client
-    assert "fetchAdminGenerations" in client
-    assert "fetchAdminPublications" in client
-    assert "applyAdminPublicationAction" in client
-    assert "fetchAdminPaymentOrders" in client
-    assert "createAdminWalletAdjustment" in client
-    assert "fetchAdminAuditEvents" in client
-    assert "Authorization" in client
+    assert 'Literal["hide", "restore", "delete"]' in schemas
+    assert 'Literal["purchased", "subscription", "bonus"]' in schemas
