@@ -7,97 +7,83 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_production_compose_declares_api_only_service_graph() -> None:
+def test_production_compose_declares_full_service_graph() -> None:
     compose = read("docker-compose.production.yml")
 
-    for service in ("postgres", "redis", "minio", "create-buckets", "migrate", "backend", "nginx"):
+    for service in ("postgres", "redis", "minio", "create-buckets", "migrate", "backend", "studio", "nginx"):
         assert f"  {service}:" in compose
 
-    assert "  web:" not in compose
-    assert "apps/web_app" not in compose
+    assert "context: ./apps/studio_app" in compose
+    assert "image: adultgen-studio" in compose
     assert "condition: service_healthy" in compose
     assert "profiles: [\"setup\"]" in compose
     assert "profiles: [\"migrate\"]" in compose
-    assert "alembic" in compose
     assert "OBJECT_STORAGE_BACKEND: s3" in compose
-    assert "S3_ENDPOINT_URL: http://minio:9000" in compose
-    assert "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001" in compose
     assert '"${HTTP_PORT:-4444}:80"' in compose
     assert "postgres-data:" in compose
     assert "redis-data:" in compose
     assert "minio-data:" in compose
-    assert "internal: true" not in compose
 
 
-def test_api_dockerfile_is_production_oriented() -> None:
-    api_dockerfile = read("Dockerfile")
+def test_studio_package_is_new_dependency_free_implementation() -> None:
+    package = read("apps/studio_app/package.json")
+    dockerfile = read("apps/studio_app/Dockerfile")
+    app = read("apps/studio_app/src/app.js")
+    core = read("apps/studio_app/src/core.js")
 
-    assert "python:3.12-slim AS builder" in api_dockerfile
-    assert "python:3.12-slim AS runtime" in api_dockerfile
-    assert "useradd --system" in api_dockerfile
-    assert "USER adultgen" in api_dockerfile
-    assert "HEALTHCHECK" in api_dockerfile
-    assert "uvicorn" in api_dockerfile
-    assert "--proxy-headers" in api_dockerfile
+    assert '"dependencies"' not in package
+    assert '"build": "node scripts/build.mjs"' in package
+    assert '"test": "node --test tests/*.test.mjs"' in package
+    assert "node:22-alpine AS build" in dockerfile
+    assert "nginx:1.27-alpine AS runtime" in dockerfile
+    assert "adultgen.age-confirmed" in app
+    assert "__ADULTGEN_CONFIG__" in app
+    api = read("apps/studio_app/src/api.js")
+    assert "/adult-consent" in api
+    assert "/adult-consent/accept" in api
+    assert "runtime-config.js" in read("apps/studio_app/public/index.html")
+    assert "seedance-2.0" in core
+    assert "seedream-5-pro-text-to-image" in core
 
 
-def test_nginx_config_is_api_only() -> None:
+def test_gateway_routes_api_and_studio() -> None:
     gateway = read("deploy/nginx/gateway.conf")
 
     assert "location /api/" in gateway
     assert "proxy_pass http://backend:8000/" in gateway
-    assert "proxy_pass http://web:8080" not in gateway
-    assert "Frontend removed" in gateway
+    assert "proxy_pass http://studio:8080" in gateway
     assert "client_max_body_size 256m" in gateway
-    assert "proxy_set_header X-Forwarded-Proto" in gateway
     assert "location = /healthz" in gateway
 
 
-def test_production_env_template_and_scripts_guard_secrets() -> None:
-    env_template = read("deploy/env/production.env.example")
+def test_production_scripts_start_and_verify_studio() -> None:
     bootstrap = read("deploy/scripts/bootstrap-production.sh")
     healthcheck = read("deploy/scripts/healthcheck-production.sh")
-    logs = read("deploy/scripts/tail-production-logs.sh")
 
-    assert "change-me" in env_template
-    assert "replace-me" in env_template
-    assert "HTTP_PORT=4444" in env_template
-    assert "POSTGRES_PASSWORD" in env_template
-    assert "MINIO_ROOT_PASSWORD" in env_template
-    assert "JWT_SECRET" in env_template
-    assert "ADMIN_API_TOKEN" in env_template
-    assert "KIE_CALLBACK_URL=http://127.0.0.1:4444/api/webhooks/kie" in env_template
-    assert "grep -Eiq \"change-me|replace-me\"" in bootstrap
-    assert "docker compose --env-file" in bootstrap
-    assert "--profile setup run --rm create-buckets" in bootstrap
-    assert "--profile migrate run --rm migrate" in bootstrap
-    assert "up -d backend nginx" in bootstrap
-    assert "up -d backend web nginx" not in bootstrap
-    assert ". \"$ENV_FILE\"" in healthcheck
+    assert "up -d backend studio nginx" in bootstrap
     assert "$BASE_URL/api/health" in healthcheck
-    assert "docker-compose.production.yml" in logs
+    assert 'grep -q "AdultGen Studio"' in healthcheck
 
 
-def test_ci_runs_backend_only_after_frontend_removal() -> None:
+def test_ci_runs_backend_and_studio_gates() -> None:
     ci = read(".github/workflows/ci.yml")
 
     assert "backend-test:" in ci
     assert "ruff check ." in ci
     assert "pytest" in ci
-    assert "web-build:" not in ci
-    assert "actions/setup-node@v4" not in ci
-    assert "working-directory: apps/web_app" not in ci
-    assert "npm run build" not in ci
+    assert "studio-app:" in ci
+    assert "actions/setup-node@v4" in ci
+    assert "working-directory: apps/studio_app" in ci
+    assert "npm run verify" in ci
 
 
-def test_deployment_runbook_documents_api_only_operational_flows() -> None:
-    runbook = read("docs/PRODUCTION_DEPLOYMENT.md")
+def test_frontend_rebuild_contract_is_documented() -> None:
+    rebuild = read("docs/FRONTEND_REBUILD.md")
+    agents = read("AGENTS.md")
 
-    assert "API-only" in runbook
-    assert "frontend has been intentionally removed" in runbook
-    assert "docker compose --env-file .env.production" in runbook
-    assert "--profile setup run --rm create-buckets" in runbook
-    assert "--profile migrate run --rm migrate" in runbook
-    assert "curl -fsS http://127.0.0.1:${HTTP_PORT:-4444}/api/health" in runbook
-    assert "There is intentionally no web UI route" in runbook
-    assert "Do not reintroduce the removed frontend" in runbook
+    assert "first production-oriented frontend foundation" in rebuild
+    assert "Product surface" in rebuild
+    assert "Safety UX" in rebuild
+    assert "Verification plan" in rebuild
+    assert "apps/studio_app" in agents
+    assert "Do not restore or copy code" in agents

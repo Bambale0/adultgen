@@ -5,8 +5,6 @@ CORE_API = ROOT / "src" / "adultgen" / "apps" / "core_api.py"
 MEDIA_ROUTER = ROOT / "src" / "adultgen" / "api" / "routers" / "media.py"
 PUBLICATIONS_ROUTER = ROOT / "src" / "adultgen" / "api" / "routers" / "publications.py"
 PUBLICATION_SERVICE = ROOT / "src" / "adultgen" / "services" / "publications.py"
-WEB_API = ROOT / "apps" / "web_app" / "src" / "api.ts"
-WEB_APP = ROOT / "apps" / "web_app" / "src" / "App.tsx"
 
 
 def test_core_api_registers_media_publication_routes() -> None:
@@ -38,19 +36,3 @@ def test_publication_feed_routes_exist() -> None:
     assert "promote_media_asset_to_published" in service_content
     assert "PublicationVisibility.FEED" in service_content
     assert "PublicationStatus.ACTIVE" in service_content
-
-
-def test_web_app_wires_media_publication_feed_collection() -> None:
-    api_content = WEB_API.read_text(encoding="utf-8")
-    app_content = WEB_APP.read_text(encoding="utf-8")
-
-    assert "uploadTemporaryMedia" in api_content
-    assert "uploadReferenceMedia" in api_content
-    assert "createPublication" in api_content
-    assert "fetchFeed" in api_content
-    assert "savePublication" in api_content
-    assert "fetchSavedCollection" in api_content
-    assert "type=\"file\"" in app_content
-    assert "Опубликовать последний upload" in app_content
-    assert "Обновить ленту" in app_content
-    assert "В коллекцию" in app_content
