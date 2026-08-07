@@ -14,6 +14,7 @@ await cp(srcDir, join(dist, "assets"), { recursive: true });
 
 const required = [
   "index.html",
+  "runtime-config.js",
   "assets/app.js",
   "assets/styles.css",
   "assets/media/feed-unit.js",

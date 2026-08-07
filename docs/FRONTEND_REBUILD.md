@@ -49,15 +49,15 @@ Direction: technical dark interface with restrained cyberpunk/HUD influence.
 
 - deep carbon surfaces;
 - pink primary action and cyan system state;
-- Archivo Narrow for display, JetBrains Mono for data, Space Grotesk for controls;
-- industrial square controls, restrained 12px card radius;
+- system narrow/sans/monospace font stacks with no external font CDN dependency;
+- industrial square controls and compact card geometry;
 - scanline texture as a non-interactive visual layer;
 - visible focus states and reduced-motion support;
-- mobile navigation at 880px and below.
+- mobile navigation at 760px and below.
 
 ## Safety UX
 
-The first entry is blocked by a required 18+ confirmation. The copy explicitly prohibits minors, coercion, exploitation, violence, and identity abuse. After Core authentication the acceptance is synchronized through `/api/adult-consent/accept`.
+The first entry is blocked by a required 18+ confirmation. The copy explicitly prohibits minors, coercion, exploitation, violence, and identity abuse. After Core authentication the current consent status is loaded from `/api/adult-consent`, and acceptance is synchronized through `/api/adult-consent/accept`.
 
 The UI does not attempt to bypass or replace backend moderation. Backend policy decisions remain authoritative.
 
@@ -67,6 +67,7 @@ Implemented calls:
 
 - `POST /api/auth/telegram-mini-app`;
 - `POST /api/auth/web-session`;
+- `GET /api/adult-consent`;
 - `POST /api/adult-consent/accept`;
 - `GET /api/feed`;
 - `GET /api/profiles/{public_id}`;
@@ -74,7 +75,7 @@ Implemented calls:
 - `GET /api/generations`;
 - `POST /api/generations`.
 
-When Telegram/Core auth is unavailable, the app remains usable as an explicit demo with bundled non-explicit media fixtures.
+When Telegram/Core auth is unavailable, the app remains usable as an explicit demo with bundled non-explicit media fixtures. The deployed bot username is read from `public/runtime-config.js` and can be overridden by the `?bot=` query parameter.
 
 ## Verification plan
 

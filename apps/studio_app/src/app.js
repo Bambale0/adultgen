@@ -128,8 +128,12 @@ async function bootstrap() {
   tg?.expand?.();
   if (!tg?.initData) return;
   try {
-    await api.authenticateTelegram({ botUsername: document.documentElement.dataset.botUsername || "adultgen_bot", initData: tg.initData, startPayload: tg.initDataUnsafe?.start_param || null });
+    const query = new URLSearchParams(location.search);
+    const botUsername = query.get("bot") || globalThis.__ADULTGEN_CONFIG__?.botUsername || "adultgen_bot";
+    await api.authenticateTelegram({ botUsername, initData: tg.initData, startPayload: tg.initDataUnsafe?.start_param || null });
     state.demo = false;
+    const consent = await api.adultConsentStatus();
+    state.ageConfirmed = Boolean(consent?.accepted);
     const response = await api.feed();
     if (response?.items?.length) state.feed = response.items.map((item) => ({ ...item, author: `@${String(item.user_id).slice(0, 8)}`, media: item.blur_required ? item.blur_preview_url || item.preview_url : item.preview_url, aspect: "portrait", model: "Core API", status: String(item.status).toUpperCase(), likes: 0, views: 0, tags: item.prompt_public ? ["prompt-open"] : ["publication"], trending: false, following: false }));
   } catch (error) {

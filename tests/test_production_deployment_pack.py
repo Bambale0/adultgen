@@ -37,7 +37,11 @@ def test_studio_package_is_new_dependency_free_implementation() -> None:
     assert "node:22-alpine AS build" in dockerfile
     assert "nginx:1.27-alpine AS runtime" in dockerfile
     assert "adultgen.age-confirmed" in app
-    assert "/adult-consent/accept" in read("apps/studio_app/src/api.js")
+    assert "__ADULTGEN_CONFIG__" in app
+    api = read("apps/studio_app/src/api.js")
+    assert "/adult-consent" in api
+    assert "/adult-consent/accept" in api
+    assert "runtime-config.js" in read("apps/studio_app/public/index.html")
     assert "seedance-2.0" in core
     assert "seedream-5-pro-text-to-image" in core
 

@@ -68,6 +68,10 @@ export class ApiClient {
     });
   }
 
+  adultConsentStatus() {
+    return this.request("/adult-consent");
+  }
+
   acceptAdultConsent() {
     return this.request("/adult-consent/accept", { method: "POST" });
   }
