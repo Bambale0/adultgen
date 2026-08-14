@@ -33,6 +33,7 @@ Every PR should pass:
 ```bash
 ruff check .
 pytest
+cd apps/web_app && npm run typecheck && npm test && npm run build
 ```
 
 GitHub Actions runs these backend gates. A PR should stay draft until they pass.
