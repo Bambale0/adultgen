@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from adultgen.api.dependencies import get_db_session, get_runtime_settings
 from adultgen.api.schemas.auth import (
     GoogleAuthRequest,
+    TelegramLoginAuthRequest,
     TelegramMiniAppAuthRequest,
     TelegramMiniAppAuthResponse,
-    TelegramLoginAuthRequest,
     UserCapabilityResponse,
     WebsiteAuthResponse,
 )
