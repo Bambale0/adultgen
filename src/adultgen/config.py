@@ -56,6 +56,11 @@ class Settings(BaseSettings):
         default=86_400,
         alias="MINI_APP_AUTH_MAX_AGE_SECONDS",
     )
+    telegram_login_max_age_seconds: int = Field(
+        default=900,
+        alias="TELEGRAM_LOGIN_MAX_AGE_SECONDS",
+    )
+    google_oauth_client_id: str = Field(default="", alias="GOOGLE_OAUTH_CLIENT_ID")
     admin_api_token: str = Field(alias="ADMIN_API_TOKEN")
 
     adult_policy_version: str = Field(default="adult-policy-v1", alias="ADULT_POLICY_VERSION")

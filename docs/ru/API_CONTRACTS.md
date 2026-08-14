@@ -4,6 +4,17 @@
 
 ## Auth
 
+### Авторизация самостоятельного сайта
+
+Сайт не обменивает произвольный email на сессию. Он отправляет в Core API подписанный провайдером credential и получает короткоживущий Core JWT.
+
+```http
+POST /auth/google
+POST /auth/telegram-login
+```
+
+Для Google backend проверяет подпись ID token, issuer, срок действия, audience и подтверждённый email; стабильный `sub` используется как внешний идентификатор. Для Telegram backend пересчитывает HMAC-SHA-256 данных Login Widget с bot token и отклоняет устаревший `auth_date`.
+
 ### Telegram Mini App auth
 
 Mini App отправляет `initData` и идентификатор текущего Telegram channel/bot.

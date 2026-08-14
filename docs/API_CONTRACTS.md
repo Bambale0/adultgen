@@ -4,6 +4,19 @@ This document defines the first API surface. Exact schemas can later be generate
 
 ## Auth principles
 
+### Standalone website auth
+
+The website never exchanges an arbitrary email address for a session. It sends a provider-signed credential to Core API and receives the same short-lived JWT contract used by the Mini App.
+
+```http
+POST /auth/google
+POST /auth/telegram-login
+```
+
+Google sends `{"credential": "google-id-token"}`. The server verifies Google's signature, issuer, expiry, audience and verified-email claim. The stable Google `sub` claim owns the external identity.
+
+Telegram sends the Login Widget fields `id`, `first_name`, optional profile fields, `auth_date`, and `hash`. The server recomputes Telegram's HMAC-SHA-256 signature with the bot token and rejects stale payloads.
+
 ### Telegram Mini App auth
 
 Client sends Telegram `initData` plus current bot channel identifier.

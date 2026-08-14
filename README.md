@@ -2,6 +2,8 @@
 
 Telegram-first AI media generation platform with Mini App, multi-reference cinematic workflows, internal credits, partner payouts, moderation, global feed, and replaceable Telegram bot channels.
 
+The repository also contains a new standalone React/Vite creator site under `apps/web_app`, with backend-verified Google and Telegram authentication and a recorded 18+ policy gate. See `docs/WEB_PRODUCT_BRIEF.md`.
+
 ## Documentation languages
 
 - English documentation entrypoint: [`docs/en/README.md`](docs/en/README.md)
