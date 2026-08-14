@@ -112,6 +112,25 @@ export type UserProfile = {
   visibility: 'public' | 'private';
 };
 
+export type MediaUpload = {
+  asset: { id: string; media_type: string; mime_type: string; is_temporary: boolean };
+};
+
+export type ModerationCase = {
+  id: string;
+  publication_id: string | null;
+  category: string;
+  description: string | null;
+  status: string;
+  priority: number;
+  resolution: string | null;
+};
+
+export function coreMediaUrl(path: string): string {
+  if (/^https?:\/\//.test(path)) return path;
+  return `${CORE_API_URL}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 export async function authenticateGoogle(credential: string): Promise<WebSession> {
   return request<WebSession>('/auth/google', {
     method: 'POST',
@@ -150,6 +169,53 @@ export function acceptAdultConsent(accessToken: string): Promise<AdultConsentSta
 
 export function fetchFeed(): Promise<{ items: FeedItem[] }> {
   return request('/feed');
+}
+
+export function uploadTemporaryMedia(accessToken: string, file: File): Promise<MediaUpload> {
+  return uploadMedia('/media/uploads/temporary', accessToken, file);
+}
+
+export function uploadReferenceMedia(accessToken: string, file: File): Promise<MediaUpload> {
+  return uploadMedia('/media/uploads/references', accessToken, file);
+}
+
+export function createPublication(
+  accessToken: string,
+  assetId: string,
+  visibility: 'profile' | 'feed' = 'profile',
+): Promise<FeedItem> {
+  return request('/publications', {
+    method: 'POST', accessToken,
+    body: JSON.stringify({ asset_id: assetId, visibility, is_explicit: true, blur_required: true, allow_remix: true, prompt_public: false }),
+  });
+}
+
+export function savePublication(accessToken: string, publicationId: string): Promise<unknown> {
+  return request(`/collections/saved/${publicationId}`, { method: 'PUT', accessToken });
+}
+
+export function fetchSavedCollection(accessToken: string): Promise<{ items: unknown[] }> {
+  return request('/collections/saved', { accessToken });
+}
+
+export function reportPublication(
+  accessToken: string, publicationId: string, category: string, description?: string,
+): Promise<ModerationCase> {
+  return request(`/publications/${publicationId}/reports`, {
+    method: 'POST', accessToken, body: JSON.stringify({ category, description }),
+  });
+}
+
+export function fetchAdminModerationCases(adminToken: string, limit = 50): Promise<{ items: ModerationCase[] }> {
+  return adminRequest(`/admin/moderation/cases?limit=${limit}`, adminToken);
+}
+
+export function resolveAdminModerationCase(
+  adminToken: string, caseId: string, action: string, resolution: string,
+): Promise<ModerationCase> {
+  return adminRequest(`/admin/moderation/cases/${caseId}/resolve`, adminToken, {
+    method: 'POST', body: JSON.stringify({ action, resolution }),
+  });
 }
 
 export function fetchWallet(accessToken: string): Promise<WalletBalance> {
@@ -264,5 +330,24 @@ async function request<T>(
     throw new Error(detail);
   }
   if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+async function uploadMedia(path: string, accessToken: string, file: File): Promise<MediaUpload> {
+  const body = new FormData();
+  body.set('file', file);
+  const response = await fetch(`${CORE_API_URL}${path}`, {
+    method: 'POST', body, headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response.json() as Promise<MediaUpload>;
+}
+
+async function adminRequest<T>(path: string, adminToken: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers);
+  headers.set('Content-Type', 'application/json');
+  headers.set('Authorization', `Bearer ${adminToken}`);
+  const response = await fetch(`${CORE_API_URL}${path}`, { ...options, headers });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   return response.json() as Promise<T>;
 }
