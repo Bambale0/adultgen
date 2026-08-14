@@ -1,6 +1,6 @@
 # AdultGen agent operating guide
 
-This repository contains an API-first adult AI media platform and a new staging web implementation. The previous frontend was intentionally removed because it was not acceptable as a product UI; it remains removed.
+This repository contains a web-first adult AI media platform backed by a FastAPI service and a new staging web implementation. The previous frontend was intentionally removed because it was not acceptable as a product UI; it remains removed.
 
 Use this file as the operating contract for Codex-style agents, AI assistants, and human developers working in this repo.
 
@@ -91,9 +91,9 @@ The user web app and locked admin shell are included for staging validation.
 
 Current expected status:
 
-- backend/API stack is ready for controlled staging/demo validation;
+- backend/API stack and the new web implementation are ready for controlled staging/demo iteration;
 - new frontend is implemented for staging review, not yet an unconditional public paid launch;
-- full public paid production launch is blocked until a new UI, provider/payment approvals, and end-to-end callbacks are validated.
+- AdultGen is not ready for full public paid production launch until provider/payment approvals and end-to-end callbacks are validated.
 
 Important blockers to keep visible:
 
@@ -120,6 +120,8 @@ Update these docs when relevant:
 
 - `AGENTS.md` — contributor/agent operating rules;
 - `docs/PRODUCTION_DEPLOYMENT.md` — runbook for running the stack;
+- `docs/FRONTEND_AUDIT_ROADMAP.md` — historical audit and rebuild boundary;
+- `docs/FRONTEND_READINESS_REPORT.md` — current frontend staging status;
 - `docs/FRONTEND_REMOVED.md` — status of removed frontend and rebuild rules;
 - `.env.example` / `deploy/env/production.env.example` — runtime configuration templates.
 
