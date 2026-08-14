@@ -189,3 +189,22 @@ Minimum object-storage backup should copy the MinIO bucket data or use `mc mirro
 ## 9. Frontend rebuild rule
 
 Do not restore the rejected frontend. The current new implementation must continue through its own PR series, tests, and visible staging review.
+
+## 10. Manual smoke checklist
+
+- Open `http://127.0.0.1:4444/` and verify desktop and mobile navigation.
+- Open `http://127.0.0.1:4444/api/health` and verify the backend health response.
+- Complete Google and Telegram sign-in on the configured staging domain.
+- Accept the recorded 18+ consent gate and submit one safe test generation.
+- Verify wallet refresh, media upload, blurred feed preview, and collection save.
+- Open `http://127.0.0.1:4444/admin`, unlock with the staging admin token, and confirm audit rows load.
+
+## 11. Demo limitations
+
+AdultGen is not ready for full public paid production launch. The controlled demo still requires:
+
+- Kie provider credentials and callback delivery validated on the deployment domain;
+- payment provider credentials and webhook delivery with written adult-category approval;
+- a real blur/thumbnail processor rather than the current staging-grade derivative path;
+- a completed backup and restore drill;
+- end-to-end Google, Telegram, payment, provider, moderation, and media-delivery validation.
