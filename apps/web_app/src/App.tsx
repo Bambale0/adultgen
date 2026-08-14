@@ -5,9 +5,9 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import {
-  createAvatar, createGeneration, createPaymentOrder, createProject,
+  coreMediaUrl, createAvatar, createGeneration, createPaymentOrder, createProject, createPublication,
   fetchCreditPackages, fetchFeed, fetchMyGenerations, fetchProfile, fetchWalletBalance,
-  importExternalMedia, initiateCrocoPayCheckout, publishResultAsset, updateProfile,
+  importExternalMedia, initiateCrocoPayCheckout, publishResultAsset, savePublication, updateProfile,
   type CreditPackage, type FeedItem, type GenerationResultAsset, type GenerationTask,
   type PaymentOrder, type UserProfile, type WalletBalance, type WebSession,
 } from './api';
@@ -214,7 +214,17 @@ function LockedScreen({ onSignIn }: { onSignIn: () => void }) {
 function DiscoverScreen({ session, onSignIn, onNavigate }: { session: WebSession | null; onSignIn: () => void; onNavigate: (route: WebAppRoute) => void }) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [tab, setTab] = useState('Featured');
-  useEffect(() => { fetchFeed().then((result) => setItems(result.items)).catch(() => setItems([])); }, []);
+  const refreshFeed = () => fetchFeed().then((result) => setItems(result.items)).catch(() => setItems([]));
+  useEffect(() => { void refreshFeed(); }, []);
+  const publishLastUpload = async () => {
+    if (!session) return onSignIn();
+    const assetId = window.sessionStorage.getItem('adultgen.last-upload-id');
+    if (assetId) await createPublication(session.access_token, assetId, 'profile');
+  };
+  const saveFirst = async () => {
+    if (!session) return onSignIn();
+    if (items[0]) await savePublication(session.access_token, items[0].id);
+  };
   const studioRoute = webAppRoutes.find((route) => route.id === 'studio')!;
   return (
     <>
@@ -229,6 +239,7 @@ function DiscoverScreen({ session, onSignIn, onNavigate }: { session: WebSession
       </section>
       <section id="signal-feed" className="feed-section">
         <div className="section-bar"><div><p className="eyebrow">PUBLIC SIGNAL</p><h3>Made with AdultGen</h3></div><div className="tab-list">{['Featured', 'Trending', 'Motion'].map((name) => <button className={tab === name ? 'active' : ''} key={name} onClick={() => setTab(name)}>{name}</button>)}</div></div>
+        <div className="feed-operations"><button onClick={() => void refreshFeed()}>Обновить ленту</button><button onClick={() => void publishLastUpload()}>Опубликовать последний upload</button><button onClick={() => void saveFirst()}>В коллекцию</button></div>
         <div className="masonry-feed">
           {items.length ? items.map((item, index) => <ApiMediaCard item={item} key={item.id} index={index} />) : demoCards.map((card) => <DemoMediaCard card={card} key={card.id} />)}
         </div>
@@ -242,7 +253,7 @@ function DemoMediaCard({ card }: { card: (typeof demoCards)[number] }) {
 }
 
 function ApiMediaCard({ item, index }: { item: FeedItem; index: number }) {
-  const src = item.blur_required ? item.blur_preview_url || item.preview_url : item.preview_url;
+  const src = coreMediaUrl(item.blur_required ? item.blur_preview_url || item.preview_url : item.preview_url);
   return <article className={`media-card ${index % 3 === 0 ? 'tall' : index % 3 === 1 ? 'wide' : 'square'}`}><div className="api-visual"><img src={src} alt={item.title || 'AdultGen creation'} loading="lazy" />{item.blur_required && <span className="safe-preview"><ShieldCheck size={14} /> 18+ BLURRED</span>}</div><div className="media-meta"><div><h4>{item.title || 'Untitled signal'}</h4><p>{item.allow_remix ? 'Remix enabled' : 'Creator original'}</p></div><div className="card-actions"><button aria-label="Нравится"><Heart size={17} /></button><button aria-label="Сохранить"><Bookmark size={17} /></button></div></div></article>;
 }
 
