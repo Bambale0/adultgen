@@ -1,6 +1,6 @@
 # AdultGen agent operating guide
 
-This repository is currently an API-first adult AI media platform backend. The previous web frontend was intentionally removed because it was not acceptable as a product UI.
+This repository contains a web-first adult AI media platform backed by a FastAPI service and a new staging web implementation. The previous frontend was intentionally removed because it was not acceptable as a product UI; it remains removed.
 
 Use this file as the operating contract for Codex-style agents, AI assistants, and human developers working in this repo.
 
@@ -8,9 +8,9 @@ Use this file as the operating contract for Codex-style agents, AI assistants, a
 
 - Core API: FastAPI backend under `src/adultgen`.
 - Admin API: backend endpoints protected by `ADMIN_API_TOKEN`.
-- Web frontend: intentionally removed. See `docs/FRONTEND_REMOVED.md`.
+- Web frontend: new React/Vite implementation under `apps/web_app`; see `docs/WEB_PRODUCT_BRIEF.md`.
 - Storage: local development adapter and S3-compatible production adapter.
-- Production pack: API-only `docker-compose.production.yml`, `deploy/`, and `docs/PRODUCTION_DEPLOYMENT.md`.
+- Production pack: web + API `docker-compose.production.yml`, `deploy/`, and `docs/PRODUCTION_DEPLOYMENT.md`.
 
 ## Hard rules
 
@@ -33,6 +33,7 @@ Every PR should pass:
 ```bash
 ruff check .
 pytest
+cd apps/web_app && npm run typecheck && npm test && npm run build
 ```
 
 GitHub Actions runs these backend gates. A PR should stay draft until they pass.
@@ -48,11 +49,11 @@ GitHub Actions runs these backend gates. A PR should stay draft until they pass.
 7. Mark ready only after green CI.
 8. Merge to `main`.
 
-## Future frontend rebuild rule
+## Frontend rebuild rule
 
 The old frontend is not a base for further iteration.
 
-Before adding a new frontend, create and approve:
+The rebuild was authorized against the approved reference direction and must retain:
 
 1. Product flow map.
 2. Wireframes for public feed, generation composer, auth/18+ gate, billing, profile, and admin.
@@ -82,22 +83,22 @@ Open:
 
 - gateway health: `http://127.0.0.1:4444/healthz`
 - API health: `http://127.0.0.1:4444/api/health`
-- frontend removal notice: `http://127.0.0.1:4444/`
+- web app: `http://127.0.0.1:4444/`
 - MinIO console: `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`
 
-There is no user web app or admin web panel in this repo until a new frontend is built.
+The user web app and locked admin shell are included for staging validation.
 
 ## Readiness status
 
 Current expected status:
 
-- backend/API stack is ready for controlled staging/demo validation;
-- frontend is intentionally removed and not ready;
-- full public paid production launch is blocked until a new UI, provider/payment approvals, and end-to-end callbacks are validated.
+- backend/API stack and the new web implementation are ready for controlled staging/demo iteration;
+- new frontend is implemented for staging review, not yet an unconditional public paid launch;
+- AdultGen is not ready for full public paid production launch until provider/payment approvals and end-to-end callbacks are validated.
 
 Important blockers to keep visible:
 
-- no production frontend exists;
+- Google OAuth and Telegram website login must be configured and validated on the production domain;
 - real blur/thumbnail processing is still not production-grade;
 - provider/payment written adult-category approval is required before real paid traffic;
 - staging must validate webhooks, payment callbacks, media delivery, admin actions, backup/restore.
@@ -120,6 +121,8 @@ Update these docs when relevant:
 
 - `AGENTS.md` — contributor/agent operating rules;
 - `docs/PRODUCTION_DEPLOYMENT.md` — runbook for running the stack;
+- `docs/FRONTEND_AUDIT_ROADMAP.md` — historical audit and rebuild boundary;
+- `docs/FRONTEND_READINESS_REPORT.md` — current frontend staging status;
 - `docs/FRONTEND_REMOVED.md` — status of removed frontend and rebuild rules;
 - `.env.example` / `deploy/env/production.env.example` — runtime configuration templates.
 

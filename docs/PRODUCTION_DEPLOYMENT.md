@@ -1,12 +1,13 @@
 # AdultGen production deployment runbook
 
-This runbook is the production-oriented deployment pack for the current API-only AdultGen stack.
+This runbook is the production-oriented deployment pack for the AdultGen web + API stack.
 
-The previous React/Vite frontend has been intentionally removed from the repository. See `docs/FRONTEND_REMOVED.md`.
+The rejected frontend remains removed. The new React/Vite frontend is defined by `docs/WEB_PRODUCT_BRIEF.md` and built from `apps/web_app`.
 
 It runs:
 
-- `nginx` public API gateway on `${HTTP_PORT:-4444}`;
+- `nginx` public web/API gateway on `${HTTP_PORT:-4444}`;
+- `web` static React/Vite application;
 - `backend` FastAPI Core API;
 - `postgres` durable application database;
 - `redis` durable queue/cache state;
@@ -17,8 +18,8 @@ It runs:
 Current intended status:
 
 - backend/API stack is suitable for controlled staging/demo validation;
-- there is no production frontend in this repository;
-- public paid production launch still requires a new approved frontend, provider/payment approval, and end-to-end callback validation.
+- the new frontend is suitable for controlled staging review;
+- public paid production launch still requires production-domain auth setup, provider/payment approval, and end-to-end callback validation.
 
 ## 0. Before you start
 
@@ -53,6 +54,16 @@ chmod 600 .env.production
 
 Fill every `change-me-*` / `replace-me-*` value before starting the stack. The helper script refuses to start while placeholders are still present.
 
+Website authentication needs:
+
+```env
+GOOGLE_OAUTH_CLIENT_ID=your-web-client.apps.googleusercontent.com
+TELEGRAM_LOGIN_BOT_USERNAME=your_bot
+TELEGRAM_LOGIN_MAX_AGE_SECONDS=900
+```
+
+In Google Cloud, add the production origin to the web client. In BotFather, use `/setdomain` for the Telegram Login Widget. Google Identity Services tokens and Telegram callback hashes are both verified by FastAPI; no provider secret is shipped to the browser.
+
 Public callback URLs should point through the gateway `/api` prefix:
 
 ```env
@@ -68,7 +79,7 @@ BILLING_BASE_URL=http://127.0.0.1:4444
 KIE_CALLBACK_URL=http://127.0.0.1:4444/api/webhooks/kie
 ```
 
-Provider/payment values can be filled with non-placeholder dummy values for an API-only smoke run. Real generation/payment callbacks require real approved provider credentials.
+Provider/payment values can be filled with non-placeholder dummy values for a UI/API smoke run. Real generation/payment callbacks require real approved provider credentials.
 
 ## 2. One-command bootstrap
 
@@ -105,10 +116,10 @@ Run migrations:
 docker compose --env-file .env.production -f docker-compose.production.yml --profile migrate run --rm migrate
 ```
 
-Start API tier:
+Start web and API tier:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.production.yml up -d backend nginx
+docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
 ```
 
 ## 4. Verify health
@@ -123,7 +134,7 @@ Expected responses:
 
 - `/healthz` -> `ok`
 - `/api/health` -> backend health response
-- `/` -> plain text notice that the frontend has been removed
+- `/` -> AdultGen web app
 
 ## 5. Access paths
 
@@ -132,12 +143,13 @@ Current public gateway paths:
 - `http://SERVER_IP:4444/healthz`
 - `http://SERVER_IP:4444/api/health`
 - `http://SERVER_IP:4444/api/*`
+- `http://SERVER_IP:4444/` and client-side application routes
 
 MinIO console remains localhost-bound by default:
 
 - `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`
 
-There is intentionally no web UI route. `/admin` is also unavailable because the previous admin web panel was part of the removed frontend. Use Admin API endpoints under `/api/admin/*` with `ADMIN_API_TOKEN`.
+`/admin` opens a locked operational shell. The token remains browser-session local and all protected server calls use Admin API endpoints under `/api/admin/*` with `ADMIN_API_TOKEN`.
 
 ## 6. Logs
 
@@ -148,16 +160,16 @@ sh deploy/scripts/tail-production-logs.sh
 Or manually:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.production.yml logs -f backend nginx postgres redis minio
+docker compose --env-file .env.production -f docker-compose.production.yml logs -f backend web nginx postgres redis minio
 ```
 
 ## 7. Update flow
 
 ```bash
 git pull origin main
-docker compose --env-file .env.production -f docker-compose.production.yml build backend nginx
+docker compose --env-file .env.production -f docker-compose.production.yml build backend web nginx
 docker compose --env-file .env.production -f docker-compose.production.yml --profile migrate run --rm migrate
-docker compose --env-file .env.production -f docker-compose.production.yml up -d backend nginx
+docker compose --env-file .env.production -f docker-compose.production.yml up -d backend web nginx
 sh deploy/scripts/healthcheck-production.sh
 ```
 
@@ -176,4 +188,23 @@ Minimum object-storage backup should copy the MinIO bucket data or use `mc mirro
 
 ## 9. Frontend rebuild rule
 
-Do not reintroduce the removed frontend by restoring old files. A new UI must start as a new product/design implementation with its own PR series, tests, and staging review.
+Do not restore the rejected frontend. The current new implementation must continue through its own PR series, tests, and visible staging review.
+
+## 10. Manual smoke checklist
+
+- Open `http://127.0.0.1:4444/` and verify desktop and mobile navigation.
+- Open `http://127.0.0.1:4444/api/health` and verify the backend health response.
+- Complete Google and Telegram sign-in on the configured staging domain.
+- Accept the recorded 18+ consent gate and submit one safe test generation.
+- Verify wallet refresh, media upload, blurred feed preview, and collection save.
+- Open `http://127.0.0.1:4444/admin`, unlock with the staging admin token, and confirm audit rows load.
+
+## 11. Demo limitations
+
+AdultGen is not ready for full public paid production launch. The controlled demo still requires:
+
+- Kie provider credentials and callback delivery validated on the deployment domain;
+- payment provider credentials and webhook delivery with written adult-category approval;
+- a real blur/thumbnail processor rather than the current staging-grade derivative path;
+- a completed backup and restore drill;
+- end-to-end Google, Telegram, payment, provider, moderation, and media-delivery validation.

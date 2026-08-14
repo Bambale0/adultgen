@@ -112,27 +112,32 @@ async def upsert_user_from_telegram(
     return _authenticated_user_from_model(user)
 
 
-async def upsert_user_from_web_session(
+async def upsert_user_from_external_identity(
     session: AsyncSession,
     *,
-    email: str,
-    display_name: str | None,
+    provider: str,
+    subject: str,
+    display_name: str,
 ) -> AuthenticatedUser:
-    """Create or update canonical user for the standalone website MVP.
+    """Create or update a canonical user for a verified external identity.
 
     The current canonical User table is keyed by ``telegram_user_id`` because the
-    first platform channel was Telegram. For the web-first MVP we reserve a
-    deterministic negative id namespace derived from email. A later migration can
+    first platform channel was Telegram. For verified non-Telegram identities we reserve a
+    deterministic negative id namespace derived from provider + stable subject. A later migration can
     split identities into a dedicated ``user_identities`` table without changing
     access-token consumers.
     """
 
-    normalized_email = email.strip().lower()
-    if not normalized_email:
-        raise UserServiceError("Email must not be empty.")
+    normalized_provider = provider.strip().lower()
+    normalized_subject = subject.strip()
+    if not normalized_provider or not normalized_subject:
+        raise UserServiceError("External identity provider and subject are required.")
 
-    synthetic_telegram_id = _web_identity_to_reserved_telegram_id(normalized_email)
-    safe_display_name = (display_name or normalized_email.split("@", maxsplit=1)[0]).strip()
+    synthetic_telegram_id = _external_identity_to_reserved_telegram_id(
+        normalized_provider,
+        normalized_subject,
+    )
+    safe_display_name = display_name.strip()
     if not safe_display_name:
         safe_display_name = "Web user"
 
@@ -208,7 +213,7 @@ def _authenticated_user_from_model(user: User) -> AuthenticatedUser:
     )
 
 
-def _web_identity_to_reserved_telegram_id(email: str) -> int:
-    digest = hashlib.sha256(email.encode()).digest()
+def _external_identity_to_reserved_telegram_id(provider: str, subject: str) -> int:
+    digest = hashlib.sha256(f"{provider}:{subject}".encode()).digest()
     numeric_id = int.from_bytes(digest[:7], byteorder="big")
     return -numeric_id

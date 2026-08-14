@@ -15,11 +15,23 @@ class TelegramMiniAppAuthRequest(BaseModel):
     start_payload: str | None = Field(default=None, description="Optional /start payload attribution.")
 
 
-class WebSessionAuthRequest(BaseModel):
-    """Website-first auth payload for the standalone web app MVP."""
+class GoogleAuthRequest(BaseModel):
+    """Google Identity Services ID token exchange payload."""
 
-    email: str = Field(min_length=3, max_length=254, description="Website account email used for the MVP web session.")
-    display_name: str | None = Field(default=None, max_length=80)
+    credential: str = Field(min_length=32, description="Google-signed ID token returned by GIS.")
+    referral_payload: str | None = Field(default=None, max_length=128)
+
+
+class TelegramLoginAuthRequest(BaseModel):
+    """Signed Telegram Login Widget callback payload."""
+
+    id: int = Field(gt=0)
+    first_name: str = Field(min_length=1, max_length=120)
+    last_name: str | None = Field(default=None, max_length=120)
+    username: str | None = Field(default=None, max_length=64)
+    photo_url: str | None = Field(default=None, max_length=2_048)
+    auth_date: int = Field(gt=0)
+    hash: str = Field(min_length=64, max_length=64)
     referral_payload: str | None = Field(default=None, max_length=128)
 
 
@@ -43,8 +55,9 @@ class TelegramMiniAppAuthResponse(BaseModel):
     capabilities: UserCapabilityResponse
 
 
-class WebSessionAuthResponse(TelegramMiniAppAuthResponse):
-    """Successful standalone website auth response."""
+class WebsiteAuthResponse(TelegramMiniAppAuthResponse):
+    """Successful standalone website provider exchange."""
 
-    email: str
+    provider: str
+    email: str | None = None
     display_name: str
