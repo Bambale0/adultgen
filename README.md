@@ -1,93 +1,46 @@
-# AdultGen
+# Experimental AI Media Platform
 
-Telegram-first AI media generation platform with Mini App, multi-reference cinematic workflows, internal credits, partner payouts, moderation, global feed, and replaceable Telegram bot channels.
+> 🚧 **Architecture scaffold / work in progress**
+>
+> This repository is an experimental product architecture and is **not one of the main portfolio projects** on this profile.
+>
+> Repository codename: `adultgen`.
 
-## Documentation languages
+The project explores a backend-first architecture for a Telegram-first AI media product with replaceable channel adapters, generation workflows, internal credits, partner accounting and moderation.
 
-- English documentation entrypoint: [`docs/en/README.md`](docs/en/README.md)
-- Русская документация: [`docs/ru/README.md`](docs/ru/README.md)
+## Current status
 
-Canonical detailed English documents currently live in the root `docs/` directory. Russian companion documents live in `docs/ru/` and must be updated together with the English docs when architecture, model capabilities, billing, safety, or API contracts change.
+The repository currently contains architecture documentation and an initial Python scaffold. It should be read as design/development work rather than a finished production system.
 
 ## Architecture direction
 
-AdultGen is designed as a backend-first platform:
-
-- Telegram bots are replaceable gateway clients.
-- Canonical users are keyed by `telegram_user_id`, not by bot.
-- Wallets use an append-only ledger.
-- Payment webhooks are captured as immutable raw records before processing.
-- Temporary generation media expires after 24 hours unless published.
-- Published profile/feed media is stored permanently until user/admin deletion.
-- Adult feed access requires 18+ consent and admin-controlled moderation.
-- Model capabilities are explicit: Seedream and Seedance payloads are selected through scenario-specific provider capability rules, not a single generic generation form.
-
-## MVP product scope
-
-- Telegram bot + Mini App.
-- Manual project and scene creation.
-- Saved avatar photo sets.
-- Seedream 5 Pro image generation/editing.
-- Seedance 2.0 video generation with text-to-video, first-frame, first+last-frame, and multimodal reference workflows.
-- Optional manually invoked AI Director.
-- Parallel generation jobs.
-- Internal credits and subscription plans.
-- SharPay/CrocoPay adapters behind Billing Gateway.
-- Partner program: 20% first payment, 5% follow-up payments for 90 days.
-- Public/private user profiles.
-- One global adult feed with likes, saves, remix, reports, and no comments.
-- Admin panel for payments, feed, moderation, payouts, broadcasts, mirrors, and audit.
+- backend-first product boundary;
+- replaceable Telegram gateway clients;
+- canonical user identity independent of a specific bot;
+- append-only wallet/ledger concepts;
+- immutable capture of payment webhook events before processing;
+- explicit provider/model capability contracts;
+- temporary-vs-published media lifecycle;
+- moderation and consent boundaries;
+- generation worker and Mini App flows planned around documented API contracts.
 
 ## Repository structure
 
 ```text
-docs/
-├── en/
-│   └── README.md
-├── ru/
-│   ├── README.md
-│   ├── ARCHITECTURE.md
-│   ├── API_CONTRACTS.md
-│   ├── MODEL_CAPABILITIES.md
-│   ├── OPERATIONAL_FLOWS.md
-│   └── SAFETY_COMPLIANCE.md
-├── ARCHITECTURE.md
-├── API_CONTRACTS.md
-├── DATA_MODEL.md
-├── MODEL_CAPABILITIES.md
-├── OPERATIONAL_FLOWS.md
-├── ROADMAP.md
-└── SAFETY_COMPLIANCE.md
-
-src/adultgen/
-├── apps/
-│   └── core_api.py
-├── domain/
-│   └── enums.py
-└── config.py
+docs/                 # architecture, API contracts, data model and roadmap
+src/adultgen/         # initial Python application/domain scaffold
+docker-compose.yml    # local infrastructure
+.env.example          # configuration contract without real credentials
 ```
 
-## Local infrastructure
+## Development
 
 ```bash
 cp .env.example .env
 docker compose up -d
-```
-
-Run Core API after installing dependencies:
-
-```bash
 uvicorn adultgen.apps.core_api:app --reload
 ```
 
-Health check:
+## Status note
 
-```bash
-curl http://localhost:8000/health
-```
-
-## Development status
-
-Current branch contains the architecture baseline and initial Python scaffold. Implementation should proceed by phases in `docs/ROADMAP.md`.
-
-Before implementing the generation worker or Mini App creation flow, read `docs/MODEL_CAPABILITIES.md` and `docs/ru/MODEL_CAPABILITIES.md`. They define the exact Seedream/Seedance operation split, payload mapping, mutual exclusion rules, callback behavior, and provider validation requirements.
+Implementation is incomplete and interfaces may change. For production-ready examples, see the completed application repositories on this GitHub profile.
